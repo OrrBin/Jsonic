@@ -1,0 +1,9 @@
+.idea
+.env/
+.venv/*
+.pytest_cache/
+docs/build/
+sample.mind.gz
+/venv/
+/helping/core/helping_pb2.py
+/helping.proto
