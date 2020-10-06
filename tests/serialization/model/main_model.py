@@ -1,5 +1,7 @@
 from datetime import datetime
+import random
 
+from serialization import register_serializable_type
 from tests.serialization.model import *
 
 
@@ -12,31 +14,43 @@ class UserCredentials:
     def __init__(self, token: str, expiration_time: datetime):
         self.token = token
         self.expiration_time = expiration_time
+        self.calculatedAttr = random.uniform(0, 1)
 
     def __eq__(self, o: object) -> bool:
         if not isinstance(o, UserCredentials):
             return NotImplemented
-        return self.token == o.token and self.expiration_time == o.expiration_time
+        return self.token == o.token and self.expiration_time == o.expiration_time and \
+               self.calculatedAttr == o.calculatedAttr
+
+    def __str__(self):
+        return f'User(token: {self.token}, expiration_time: {self.expiration_time}, calculatedAttr: {self.calculatedAttr}'
+
+
+# Register UserCredentials which represents class from another module that does not implement Serializable
+register_serializable_type(UserCredentials)
 
 
 class User(Serializable):
+    transient_attributes = ['userCalculatedAttr']
+
     def __init__(self, user_id: str, birth_time: datetime, user_credentials: UserCredentials, **kwargs):
         super().__init__(**kwargs)
         self.user_id = user_id
         self.birth_time = birth_time
         self.user_credentials = user_credentials
+        self.userCalculatedAttr = 'userCalculatedAttr'
 
     def __eq__(self, o: object) -> bool:
         if not isinstance(o, User):
             return NotImplemented
         return self.user_id == o.user_id and self.birth_time == o.birth_time and self.user_credentials == o.user_credentials
 
-    @classmethod
-    def from_json(cls, data):
-        return cls(**data)
+    def __str__(self):
+        return f'User(user_credentials: {self.user_credentials})'
 
 
 class Product(Serializable):
+
     def __init__(self, product_id: str, user_id: str, description: str, profile: CategoryProfile,
                  time: datetime, amount: Amount = Amount(1), **kwargs):
         super().__init__(**kwargs)
@@ -47,12 +61,6 @@ class Product(Serializable):
         self.profile = profile
         self.amount = amount
         self.time = time
-
-    @classmethod
-    def from_json(cls, data):
-        profile = CategoryProfile.from_json(data['profile'])
-        amount = Amount.from_json(data['amount'])
-        return cls(data['product_id'], data['user_id'], data['description'], profile, amount)
 
     def __eq__(self, o: object) -> bool:
         if not isinstance(o, Product):
@@ -74,16 +82,6 @@ class Donation(Serializable):
         self.contact = contact
         self._privateAttr = 'donationPrivate'
         self.time = time
-
-    @classmethod
-    def from_json(cls, data):
-        location = Coordinate.from_json(data['location'])
-        address = Address.from_json(data['address'])
-        contact = ContactDetails.from_json(data['contact'])
-
-        return cls(donation_id=data['donation_id'], user_id=data['user_id'], product_ids=data['product_ids'],
-                   description=data['description'], location=location, address=address,
-                   contact=contact)
 
     def __eq__(self, o: object) -> bool:
         if not isinstance(o, Donation):

@@ -4,10 +4,6 @@ from tests.serialization.model import UserCredentials
 
 
 def test_complex_usage():
-
-    # Register UserCredentials which represents class from another module that does not implement Serializable
-    register_serializable_type(UserCredentials)
-
     for user in mock.users:
         user_json_obj = serialize(user, serialize_private_attributes=True)
         print(f'serialized user: {user_json_obj}')
