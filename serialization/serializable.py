@@ -3,12 +3,18 @@ from datetime import datetime
 from typing import List, Dict
 import inspect
 
+SERIALIZED_TYPE_ATTRIBUTE_NAME = '_serialized_type'
+
+
 class SerializableTypeData:
-    def __init__(self, cls: type, transient_attributes=None):
+    def __init__(self, cls: type, transient_attributes=None, init_parameters_mapping=None):
         if transient_attributes is None:
             transient_attributes = []
+        if init_parameters_mapping is None:
+            init_parameters_mapping = {}
         self.cls = cls
         self.transient_attributes = transient_attributes
+        self.init_parameters_mapping = init_parameters_mapping
 
 
 class Serializable:
@@ -22,19 +28,20 @@ class Serializable:
 
     serializable_types: Dict[str, SerializableTypeData] = {}
     transient_attributes: List[str] = None
+    init_parameters_mapping: Dict[str, str] = None
 
     def __init__(self, **kwargs) -> None:
         super().__init__()
 
     def __init_subclass__(cls) -> None:
-        register_serializable_type(cls, cls.transient_attributes)
+        register_serializable_type(cls, cls.transient_attributes, cls.init_parameters_mapping)
 
     @classmethod
     def serialize_object(cls, obj, serialize_private_attributes=False):
         typ = type(obj)
         if typ in Serializer.serializers:
             value = Serializer.serializers[typ](obj)
-            value['_serialized_type'] = typ.__name__
+            value[SERIALIZED_TYPE_ATTRIBUTE_NAME] = typ.__name__
             return value
 
         elif hasattr(obj, '__dict__'):
@@ -57,7 +64,7 @@ class Serializable:
                     ignored_attributes[key] = getattr(obj, key)
                     delattr(obj, key)
 
-            setattr(obj, '_serialized_type', fullname(typ))
+            setattr(obj, SERIALIZED_TYPE_ATTRIBUTE_NAME, fullname(typ))
             result = {}
             for key, value in obj.__dict__.items():
                 result[key] = value
@@ -74,57 +81,82 @@ def serialize(obj, serialize_private_attributes=False):
     return json.loads(json_str)
 
 
-def register_serializable_type(cls, transient_attributes: List[str] = None):
+def register_serializable_type(cls, transient_attributes: List[str] = None,
+                               init_parameters_mapping: Dict[str, str] = None):
     class_name = fullname(cls)
-    Serializable.serializable_types[class_name] = SerializableTypeData(cls, transient_attributes)
+    Serializable.serializable_types[class_name] = SerializableTypeData(cls, transient_attributes,
+                                                                       init_parameters_mapping)
 
 
 def deserialize(obj, deserialize_private_attributes=False):
     if type(obj) == list:
         return deserialize_list(obj, deserialize_private_attributes)
     elif type(obj) == dict:
+        if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj and obj[SERIALIZED_TYPE_ATTRIBUTE_NAME] in Deserializer.deserializers:
+            # There is custom deserializer for given objects serialized type, so use it
+            return deserialize_with_custom_deserializer(obj)
         return deserialize_dict(obj, deserialize_private_attributes)
     else:
         return obj
 
 
+def deserialize_with_custom_deserializer(obj):
+    if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj:
+        type_name = obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
+        if type_name in Deserializer.deserializers:
+            del obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
+            result = Deserializer.deserializers[type_name](obj)
+            obj[SERIALIZED_TYPE_ATTRIBUTE_NAME] = type_name
+            return result
+
+        raise TypeError('Could not find custom deserializer')
+
+    raise TypeError('Missing attribute _serialized_type')
+
+
 def deserialize_dict(obj: dict, deserialize_private_attributes=False):
     deserialized_dict = {}
 
-    if '_serialized_type' in obj:
-        type_name = obj['_serialized_type']
-        if type_name in Deserializer.deserializers:
-            del obj['_serialized_type']
-            result = Deserializer.deserializers[type_name](obj)
-            obj['_serialized_type'] = type_name
-            return result
-
     for key, value in obj.items():
-        if key == '_serialized_type':
+        if key == SERIALIZED_TYPE_ATTRIBUTE_NAME:
             pass
         elif not deserialize_private_attributes and key.startswith('_'):
             pass
         elif type(value) == list:
             deserialized_dict[key] = deserialize(value, deserialize_private_attributes)
-        elif type(value) == dict and '_serialized_type' in value:
+        elif type(value) == dict and SERIALIZED_TYPE_ATTRIBUTE_NAME in value:
             deserialized_dict[key] = deserialize(value, deserialize_private_attributes)
         else:
             deserialized_dict[key] = value
 
-    class_name = obj['_serialized_type']
+    class_name = obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
     cls = Serializable.serializable_types[class_name].cls
 
-    attributes_not_to_constructor = {}
+    init_dict = {}
+
     sign = inspect.signature(cls.__init__)
+
+    init_parameters_mapping = Serializable.serializable_types[class_name].init_parameters_mapping
+
+    for parameter_name, parameter_data in sign.parameters.items():
+        if not deserialize_private_attributes and parameter_name.startswith('_'):
+            continue
+        if parameter_name == 'self':
+            pass
+        elif parameter_data.kind == inspect.Parameter.VAR_KEYWORD or \
+                parameter_data.kind == inspect.Parameter.VAR_POSITIONAL:
+            pass
+        elif parameter_name in init_parameters_mapping:
+            init_dict[parameter_name] = deserialized_dict[init_parameters_mapping[parameter_name]]
+        else:  # assuming parameter has same name as corresponding attribute
+            init_dict[parameter_name] = deserialized_dict[parameter_name]
+
+    attributes_not_to_constructor = {}
     for candidate in deserialized_dict.keys():
         if candidate not in sign.parameters:
             attributes_not_to_constructor[candidate] = deserialized_dict[candidate]
 
-    for candidate in attributes_not_to_constructor.keys():
-        print(f'removing parameter: {candidate} from {class_name}')
-        del deserialized_dict[candidate]
-
-    created_instance = cls(**deserialized_dict)
+    created_instance = cls(**init_dict)
     for attr_name, attr_value in attributes_not_to_constructor.items():
         setattr(created_instance, attr_name, attr_value)
 
@@ -167,7 +199,7 @@ def serializer(serialized_type):
 
 
 class Deserializer:
-    f"""
+    """
     Decorator that registers deserializer function for a specific type
     deserializer function must return the type it is registered with.
     

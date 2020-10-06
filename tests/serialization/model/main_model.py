@@ -11,9 +11,9 @@ class UserCredentials:
     We can register it using register_serializable_type function
     """
 
-    def __init__(self, token: str, expiration_time: datetime):
+    def __init__(self, token: str, exp: datetime):
         self.token = token
-        self.expiration_time = expiration_time
+        self.expiration_time = exp
         self.calculatedAttr = random.uniform(0, 1)
 
     def __eq__(self, o: object) -> bool:
@@ -27,15 +27,16 @@ class UserCredentials:
 
 
 # Register UserCredentials which represents class from another module that does not implement Serializable
-register_serializable_type(UserCredentials)
+register_serializable_type(UserCredentials, init_parameters_mapping={'exp': 'expiration_time'})
 
 
 class User(Serializable):
     transient_attributes = ['userCalculatedAttr']
+    init_parameters_mapping = {'id': 'user_id'}
 
-    def __init__(self, user_id: str, birth_time: datetime, user_credentials: UserCredentials, **kwargs):
+    def __init__(self, id: str, birth_time: datetime, user_credentials: UserCredentials, *args, **kwargs):
         super().__init__(**kwargs)
-        self.user_id = user_id
+        self.user_id = id
         self.birth_time = birth_time
         self.user_credentials = user_credentials
         self.userCalculatedAttr = 'userCalculatedAttr'

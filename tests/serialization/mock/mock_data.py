@@ -5,12 +5,12 @@ from tests.serialization.model import Product, CategoryProfile, User, Amount, Do
     UserCredentials
 
 users: List[User] = [
-    User(user_id='user_1', birth_time=datetime(1995, 7, 5, 0),
-         user_credentials=UserCredentials(token='token', expiration_time=datetime(2020, 11, 1, 0))),
-    User(user_id='user_2', birth_time=datetime(1996, 2, 3, 0),
-         user_credentials=UserCredentials(token='token', expiration_time=datetime(2020, 11, 1, 0))),
-    User(user_id='user_3', birth_time=datetime(1997, 4, 9, 6),
-         user_credentials=UserCredentials(token='token', expiration_time=datetime(2020, 11, 1, 0)))
+    User(id='user_1', birth_time=datetime(1995, 7, 5, 0),
+         user_credentials=UserCredentials(token='token', exp=datetime(2020, 11, 1, 0))),
+    User(id='user_2', birth_time=datetime(1996, 2, 3, 0),
+         user_credentials=UserCredentials(token='token', exp=datetime(2020, 11, 1, 0))),
+    User(id='user_3', birth_time=datetime(1997, 4, 9, 6),
+         user_credentials=UserCredentials(token='token', exp=datetime(2020, 11, 1, 0)))
 ]
 
 products: List[Product] = [
