@@ -78,10 +78,10 @@ The main source of those limitations is the nature of serialization process in g
 The main focus of `Jsonic` is serialization of `data classes`, which represents big chunk 
 of serialization work in general.
 
-- Most obvious limitation is that only instances of ’serializable type’s can be serialized.
+- Most obvious limitation is that only instances of `serializable type`'s can be serialized.
 The immediate effect is that when we want to serialize an instance of class from external source we need to manually register it and all its
 nested object types.
-- Jsonic is meant mostly to serialize ’data classes’, and have some technical limitations:
+- Jsonic is meant mostly to serialize `data classes`, and have some technical limitations:
     - If a class `__init__` method has parameters it gets but not persisting as an attribute, it is not `serializable type` even if it meets
      all there conditions.
      This is because when deserializing a `representation of serializable type` an instance of the given type must be created.
