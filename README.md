@@ -4,14 +4,19 @@ Jsonic is a lightweight utility for serializing/deserializing python objects to/
 
 ## Jsonic components
 
-##### Definition: `serializable type`
-serializable type is one of the following :
+##### Definition: `serializable type`  
+`serializable type` is one of the following :
 1. `int` `float` `str` `bool`
 1. Class instances of classes extending ``Serializable``
 2. Classes registered using ``register_serializable_type`` 
 3. Classes that a custom `@serializer` and `@deserializer` was registered for
 4. `dict` with `str` keys that all it's nested values are `serializable type`
 4. `list` with which all it's elements are `serializable type`  
+
+
+##### Definition: `representation of serializable type`
+`representation of serializable type` is an output of a successful call of `serialize` function on `serializable type` instance
+
 
 ### Serializable class
 Classes extending `Serializable` can be serialized into json dict/string representing the object,
@@ -50,3 +55,19 @@ Serializes ``class instance`` / ``dict`` / ``list`` / ``other python type`` into
 
 #### Note:
 Only ``serializable type`` can be serialized using this function
+
+### deserialize function
+Deserializes `python dict` / `JSON string`, which is `representation of serializable type`
+
+#### Note:
+Only ``serializable type`` can be deserialized using this function
+
+### @serializer Decorator
+Used to register custom serializer for specific type.
+
+These custom serializers are used in the process of serializing `serializable type`   
+
+### @deserializer Decorator
+Used to register custom deserializer for specific type.
+
+These custom deserializers are used in the process of deserializing `representation of serializable type`
