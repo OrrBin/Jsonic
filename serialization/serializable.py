@@ -83,30 +83,33 @@ def serialize(obj, serialize_private_attributes=False, output_as_string=False):
     return json_str if output_as_string else json.loads(json_str)
 
 
-def deserialize(obj, deserialize_private_attributes=False, string_input=False):
+def deserialize(obj, deserialize_private_attributes: bool = False, string_input: bool = False, expected_type: type = None):
     """
     Deserializes dictionary/json string representing dictionary, that was returned by ``serialize`` function call on an object
 
     Args:
         obj: dictionary/json string representing dictionary, that is a result of ``serialize`` function on an object
-        deserialize_private_attributes: should deserialize private attributes (attributes which their name starts with ``_``)
-        string_input: is the input of type ``json string``, or ``dict``
-
+        deserialize_private_attributes (bool): should deserialize private attributes (attributes which their name starts with ``_``)
+        string_input (bool): is the input of type ``json string``, or ``dict``
+        expected_type: the deserialized result expected type
     Returns:
         object / class instance / dict / list, depending on the serialized input
+
+    Raises:
+        AttributeError: When the serialized type is different from the expected type
     """
     if string_input:
         if type(obj) != str:
             raise TypeError(f'deserializing string, but input was not of type str. given input: {obj}')
-        return deserialize(json.loads(obj), deserialize_private_attributes=deserialize_private_attributes)
+        return deserialize(json.loads(obj), expected_type=expected_type, deserialize_private_attributes=deserialize_private_attributes)
 
     if type(obj) == list:
-        return _deserialize_list(obj, deserialize_private_attributes=deserialize_private_attributes)
+        return _deserialize_list(obj, expected_type=expected_type, deserialize_private_attributes=deserialize_private_attributes)
     elif type(obj) == dict:
         if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj and obj[SERIALIZED_TYPE_ATTRIBUTE_NAME] in _Deserializer.deserializers:
             # There is custom deserializer for given objects serialized type, so use it
-            return _deserialize_with_custom_deserializer(obj)
-        return _deserialize_dict(obj, deserialize_private_attributes=deserialize_private_attributes)
+            return _deserialize_with_custom_deserializer(obj, expected_type=expected_type)
+        return _deserialize_dict(obj, expected_type=expected_type, deserialize_private_attributes=deserialize_private_attributes)
     else:
         return obj
 
@@ -168,9 +171,11 @@ def _serialize_object(obj, serialize_private_attributes=False):
     raise TypeError(f'Could not find serializer for type: {typ}')
 
 
-def _deserialize_with_custom_deserializer(obj):
+def _deserialize_with_custom_deserializer(obj, expected_type: type = None):
     if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj:
         type_name = obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
+        if expected_type and full_type_name(expected_type) != type_name:
+            raise AttributeError(f'Deserializing type {type_name}, which is not the expected type: {expected_type}')
         if type_name in _Deserializer.deserializers:
             del obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
             result = _Deserializer.deserializers[type_name](obj)
@@ -182,7 +187,41 @@ def _deserialize_with_custom_deserializer(obj):
     raise TypeError(f'Missing attribute _serialized_type for object: {obj}')
 
 
-def _deserialize_dict(obj: dict, deserialize_private_attributes=False):
+def _deserialize_dict(obj: dict, deserialize_private_attributes=False, expected_type: type = None):
+    if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj:
+        return _deserialize_serializable_type_dict(obj, deserialize_private_attributes=deserialize_private_attributes,
+                                                   expected_type=expected_type)
+
+    return _deserialize_generic_dict(obj, deserialize_private_attributes=deserialize_private_attributes, expected_type=expected_type)
+
+
+def _deserialize_generic_dict(obj: dict, deserialize_private_attributes: bool = False, expected_type: type = None):
+    if expected_type and expected_type != dict:
+        raise AttributeError(f'Deserializing type dict, which is not the expected type: {expected_type}')
+
+    deserialized_dict = {}
+
+    for key, value in obj.items():
+        if (type(value) == dict and SERIALIZED_TYPE_ATTRIBUTE_NAME in value) or type(value) == list:
+            deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
+        elif type(value) == dict:  # value is is a dict but not serializable type dict
+            deserialized_dict[key] = _deserialize_generic_dict(value, deserialize_private_attributes=deserialize_private_attributes)
+        else:
+            deserialized_dict[key] = value
+
+    return deserialized_dict
+
+
+def _deserialize_serializable_type_dict(obj: dict, deserialize_private_attributes=False, expected_type: type = None):
+    if SERIALIZED_TYPE_ATTRIBUTE_NAME not in obj:
+        raise TypeError(f'Deserializing dict of serializable type but could not find {SERIALIZED_TYPE_ATTRIBUTE_NAME} attribute')
+
+    type_name = obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
+    cls = Serializable.serializable_types[type_name].cls
+
+    if expected_type and full_type_name(expected_type) != type_name:
+        raise AttributeError(f'Deserializing type {type_name}, which is not the expected type: {expected_type}')
+
     deserialized_dict = {}
 
     for key, value in obj.items():
@@ -197,14 +236,11 @@ def _deserialize_dict(obj: dict, deserialize_private_attributes=False):
         else:
             deserialized_dict[key] = value
 
-    class_name = obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
-    cls = Serializable.serializable_types[class_name].cls
-
     init_dict = {}
 
     sign = inspect.signature(cls.__init__)
 
-    init_parameters_mapping = Serializable.serializable_types[class_name].init_parameters_mapping
+    init_parameters_mapping = Serializable.serializable_types[type_name].init_parameters_mapping
 
     for parameter_name, parameter_data in sign.parameters.items():
         if not deserialize_private_attributes and parameter_name.startswith('_'):
@@ -231,7 +267,9 @@ def _deserialize_dict(obj: dict, deserialize_private_attributes=False):
     return created_instance
 
 
-def _deserialize_list(lst: list, deserialize_private_attributes=False):
+def _deserialize_list(lst: list, deserialize_private_attributes=False, expected_type: type = None):
+    if expected_type and expected_type != list:
+        raise AttributeError(f'Deserializing list, which is not the expected type: {expected_type}')
     deserialized_list = []
     for element in lst:
         deserialized_list.append(deserialize(element, deserialize_private_attributes=deserialize_private_attributes))
