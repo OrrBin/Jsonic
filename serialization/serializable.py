@@ -65,7 +65,7 @@ class Serializable:
 
 def serialize(obj, serialize_private_attributes=False, string_output=False):
     """
-     Serializes ``object`` / ``class instance`` / ``dict`` / ``list`` into ``dictionary`` / ``json string`` representing the input
+     Serializes ``class instance`` / ``dict`` / ``list`` / ``other python type`` into ``dictionary`` / ``json string`` representing the input
 
     Args:
         obj: ``object`` / ``class instance`` / ``dict`` / ``list`` to be serializes
@@ -118,8 +118,8 @@ def register_serializable_type(cls, transient_attributes: List[str] = None,
     """
     Registers serializable type with it's metadata.
     Can be used to register classes that doesn't extend ``Serializable``, from example classes from external source.
-    Only registered classes or classes extending ``Serializable`` can be serialized using ``serialize`` function
-    and deserialized using ``deserialized`` function
+    Only registered classes, classes extending ``Serializable`` or classes that a custom serializer and deserializer were registered for
+    can be serialized using ``serialize`` function and deserialized using ``deserialized`` function
 
     Args:
         cls (type):

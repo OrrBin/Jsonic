@@ -43,6 +43,19 @@ class User(Serializable):
 
 
 def test_basic_usage():
+
+    test_number = 'testString'
+    json_obj = serialize(test_number)
+    new_obj = deserialize(json_obj)
+
+    assert test_number == new_obj
+
+    test_number = -42
+    json_obj = serialize(test_number)
+    new_obj = deserialize(json_obj)
+
+    assert test_number == new_obj
+
     testUser = User(name='testUser', id=1, address=Address('myCity', 'myStreet'), time=datetime(2020, 10, 5),
                     contact=ContactDetails(phone='05099999', email='abc@gmail.com',
                                            _private_in_contact='_private_in_contact'), _private_in_user='manualPrivate')
