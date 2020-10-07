@@ -73,10 +73,27 @@ Used to register custom deserializer for specific type.
 These custom deserializers are used in the process of deserializing `representation of serializable type`
 
 ## Jsonic current limitations
-There are few obvious limitations to ’Jsonic’ and a few more subtle ones.
+There are few obvious limitations to `Jsonic` and a few more subtle ones.
+The main source of those limitations is the nature of serialization process in general.
+The main focus of `Jsonic` is serialization of `data classes`, which represents big chunk 
+of serialization work in general.
 
 - Most obvious limitation is that only instances of ’serializable type’s can be serialized.
-The immediate effect is that when we want to serialize from external source we need to manually register it and all its nested object types.
-- Jsonic is meant mostly to serialize ’data objects’, and have some technical limitations:
-    - If a class has __init__ method parameters which are positional-only parameters, it is not ’serializable type’ even if it meets all other conditions.
-    This is because when deserilizing a ’representation of serializable type’ an instance of the given type must be created. TO_BE_CONTINUED
+The immediate effect is that when we want to serialize an instance of class from external source we need to manually register it and all its
+nested object types.
+- Jsonic is meant mostly to serialize ’data classes’, and have some technical limitations:
+    - If a class `__init__` method has parameters it gets but not persisting as an attribute, it is not `serializable type` even if it meets
+     all there conditions.
+     This is because when deserializing a `representation of serializable type` an instance of the given type must be created.
+     We need to pass to the constructor the corresponding attributes. Therefore if there are parameters it gets and are not 
+     being persisted into an instance attribute we won't be able to pass them when creating the instance.
+        - Example: A class gets in it's construction some service class instance, and in it's instance construction
+        it calls a method of that service, but does not persist this service instance. 
+        `Jsonic` won't be able to deserialize this class properly.     
+    - If a class `__init__` method has parameters which are `positional-only` parameters, it is not `serializable type` even if it meets
+    all other conditions.
+    This is because when deserializing a `representation of serializable type` an instance of the given type must be created.
+    We need to pass to the constructor the corresponding attributes. We can pass only keyword arguments which correspond to 
+    an instance attribute.
+    - `*args and **kwargs`: if a class `__init__` method accepts *args or **kwargs, in many cases `Jsonic` won't be able to
+     deserialize it properly
