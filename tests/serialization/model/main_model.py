@@ -34,8 +34,8 @@ class User(Serializable):
     transient_attributes = ['userCalculatedAttr']
     init_parameters_mapping = {'id': 'user_id'}
 
-    def __init__(self, id: str, birth_time: datetime, user_credentials: UserCredentials, *args, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, id: str, birth_time: datetime, user_credentials: UserCredentials, *args):
+        super().__init__()
         self.user_id = id
         self.birth_time = birth_time
         self.user_credentials = user_credentials
@@ -53,8 +53,8 @@ class User(Serializable):
 class Product(Serializable):
 
     def __init__(self, product_id: str, user_id: str, description: str, profile: CategoryProfile,
-                 time: datetime, amount: Amount = Amount(1), **kwargs):
-        super().__init__(**kwargs)
+                 time: datetime, amount: Amount = Amount(1)):
+        super().__init__()
 
         self.product_id = product_id
         self.user_id = user_id
@@ -73,7 +73,7 @@ class Product(Serializable):
 class Donation(Serializable):
     def __init__(self, donation_id: str, user_id: str, product_ids: List[str], time: datetime, description: str = '',
                  address: Address = None, location: Coordinate = None, contact: ContactDetails = None, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__()
         self.donation_id = donation_id
         self.user_id = user_id
         self.product_ids = product_ids

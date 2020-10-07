@@ -4,8 +4,8 @@ from serialization import Serializable
 
 
 class AttributeProfile(Serializable):
-    def __init__(self, attribute_id: str, values: List[str], **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, attribute_id: str, values: List[str]):
+        super().__init__()
         self.attribute_id = attribute_id
         self.values = values
 
@@ -19,8 +19,8 @@ class AttributeProfile(Serializable):
 
 
 class CategoryProfile(Serializable):
-    def __init__(self, category_id: str, attributes: List[AttributeProfile], **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, category_id: str, attributes: List[AttributeProfile]):
+        super().__init__()
         self.category_id = category_id
         self.attributes = attributes
 
@@ -34,8 +34,8 @@ class CategoryProfile(Serializable):
 
 
 class Amount(Serializable):
-    def __init__(self, amount: int, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, amount: int):
+        super().__init__()
         self.amount = amount
 
     def __eq__(self, o: object) -> bool:
@@ -48,8 +48,8 @@ class Amount(Serializable):
 
 
 class Coordinate(Serializable):
-    def __init__(self, longitude: float, latitude: float, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, longitude: float, latitude: float):
+        super().__init__()
         self.longitude = longitude
         self.latitude = latitude
 
@@ -63,8 +63,8 @@ class Coordinate(Serializable):
 
 
 class Address(Serializable):
-    def __init__(self, address: str, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, address: str):
+        super().__init__()
         self.address = address
 
     def __eq__(self, o: object) -> bool:
@@ -77,8 +77,8 @@ class Address(Serializable):
 
 
 class Location(Serializable):
-    def __init__(self, coord: Coordinate, address: Address, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, coord: Coordinate, address: Address):
+        super().__init__()
         self.coord = coord
         self.address = address
 
@@ -92,8 +92,8 @@ class Location(Serializable):
 
 
 class ContactDetails(Serializable):
-    def __init__(self, phone_number: str, email: str, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, phone_number: str, email: str):
+        super().__init__()
         self.phone_number = phone_number
         self.email = email
 

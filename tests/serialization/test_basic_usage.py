@@ -12,22 +12,12 @@ class Address:
         return f'Address({self.city}, {self.street})'
 
 
-# @serializer(serialized_type=Address)
-# def serialize_address(address_obj: Address):
-#     return {'city': address_obj.city, 'street': address_obj.street}
-#
-#
-# @deserializer(deserialized_type_name=Address)
-# def deserialize_datetime(serialized_address):
-#     return Address(**serialized_address)
-
-
 register_serializable_type(Address)
 
 
 class ContactDetails(Serializable):
     def __init__(self, phone: str, email: str, _private_in_contact: str = '', **kwargs) -> None:
-        super().__init__(**kwargs)
+        super().__init__()
         self.phone = phone
         self.email = email
         self._private_in_contact = _private_in_contact
@@ -39,7 +29,7 @@ class ContactDetails(Serializable):
 class User(Serializable):
     def __init__(self, name: str, id: int, address: Address, time: datetime, contact: ContactDetails,
                  _private_in_user='testPrivate', **kwargs) -> None:
-        super().__init__(**kwargs)
+        super().__init__()
         self.name = name
         self.id = id
         self.address = address
