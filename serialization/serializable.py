@@ -64,14 +64,14 @@ class Serializable:
         register_serializable_type(cls, cls.transient_attributes, cls.init_parameters_mapping)
 
 
-def serialize(obj, serialize_private_attributes=False, output_as_string=False):
+def serialize(obj, serialize_private_attributes=False, string_output=False):
     """
      Serializes ``object`` / ``class instance`` / ``dict`` / ``list`` into ``dictionary`` / ``json string`` representing the input
 
     Args:
         obj: ``object`` / ``class instance`` / ``dict`` / ``list`` to be serializes
         serialize_private_attributes: should serialize private attributes (attributes which their name starts with ``_``)
-        output_as_string: serialize into json string or ``dict`` / ``list
+        string_output: serialize into json string or ``dict`` / ``list
 
     Returns:
         ``dictionary`` / ``json string`` representing the input
@@ -80,7 +80,7 @@ def serialize(obj, serialize_private_attributes=False, output_as_string=False):
         Only class instances of classes extending ``Serializable`` or registered using ``register_serializable_type`` can be serialized
     """
     json_str = json.dumps(obj, default=lambda o: _serialize_object(o, serialize_private_attributes))
-    return json_str if output_as_string else json.loads(json_str)
+    return json_str if string_output else json.loads(json_str)
 
 
 def deserialize(obj, deserialize_private_attributes: bool = False, string_input: bool = False, expected_type: type = None):

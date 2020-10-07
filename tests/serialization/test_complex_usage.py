@@ -9,15 +9,15 @@ from tests.serialization.model import Product, Donation
 
 def test_user_serialization():
     for user in mock.users:
-        user_json_obj = serialize(user, output_as_string=False, serialize_private_attributes=True)
+        user_json_obj = serialize(user, string_output=False, serialize_private_attributes=True)
         new_user = deserialize(user_json_obj, string_input=False, deserialize_private_attributes=True)
         assert new_user == user
 
-        user_json_obj = serialize(user, output_as_string=True, serialize_private_attributes=True)
+        user_json_obj = serialize(user, string_output=True, serialize_private_attributes=True)
         new_user = deserialize(user_json_obj, string_input=True, deserialize_private_attributes=True)
         assert new_user == user
 
-        user_json_obj = serialize(user, output_as_string=False, serialize_private_attributes=True)
+        user_json_obj = serialize(user, string_output=False, serialize_private_attributes=True)
         with pytest.raises(TypeError, match='deserializing string'):
             deserialize(user_json_obj, string_input=True, deserialize_private_attributes=True)
 
@@ -31,7 +31,7 @@ def test_user_list_serialization():
     new_list = deserialize(json_list)
     assert new_list == mock.users
 
-    json_list = serialize(mock.users, serialize_private_attributes=True, output_as_string=True)
+    json_list = serialize(mock.users, serialize_private_attributes=True, string_output=True)
     new_list = deserialize(json_list, deserialize_private_attributes=True, string_input=True)
     assert new_list == mock.users
 
@@ -49,7 +49,7 @@ def test_user_dict_serialization():
 
     assert obj == new_obj
 
-    json_obj = serialize(obj, output_as_string=True)
+    json_obj = serialize(obj, string_output=True)
     new_obj = deserialize(json_obj, string_input=True)
 
     assert obj == new_obj
@@ -61,11 +61,11 @@ def test_product_serialization():
         new_product = deserialize(product_json_obj, deserialize_private_attributes=True)
         assert new_product == product
 
-        product_json_obj = serialize(product, output_as_string=True, serialize_private_attributes=True)
+        product_json_obj = serialize(product, string_output=True, serialize_private_attributes=True)
         new_product = deserialize(product_json_obj, string_input=True, deserialize_private_attributes=True)
         assert new_product == product
 
-        product_json_obj = serialize(product, output_as_string=False, serialize_private_attributes=True)
+        product_json_obj = serialize(product, string_output=False, serialize_private_attributes=True)
         with pytest.raises(TypeError, match='deserializing string'):
             deserialize(product_json_obj, string_input=True, deserialize_private_attributes=True)
 
@@ -79,7 +79,7 @@ def test_product_list_serialization():
     new_list = deserialize(json_list)
     assert new_list == mock.products
 
-    json_list = serialize(mock.products, serialize_private_attributes=True, output_as_string=True)
+    json_list = serialize(mock.products, serialize_private_attributes=True, string_output=True)
     new_list = deserialize(json_list, deserialize_private_attributes=True, string_input=True)
     assert new_list == mock.products
 
@@ -104,7 +104,7 @@ def test_product_dict_serialization():
 
     assert obj == new_obj
 
-    json_obj = serialize(obj, output_as_string=True)
+    json_obj = serialize(obj, string_output=True)
     new_obj = deserialize(json_obj, string_input=True)
 
     assert obj == new_obj
@@ -116,11 +116,11 @@ def test_donation_serialization():
         new_donation = deserialize(donation_json_obj, deserialize_private_attributes=True)
         assert new_donation == donation
 
-        donation_json_obj = serialize(donation, output_as_string=True, serialize_private_attributes=True)
+        donation_json_obj = serialize(donation, string_output=True, serialize_private_attributes=True)
         new_donation = deserialize(donation_json_obj, string_input=True, deserialize_private_attributes=True)
         assert new_donation == donation
 
-        donation_json_obj = serialize(donation, output_as_string=False, serialize_private_attributes=True)
+        donation_json_obj = serialize(donation, string_output=False, serialize_private_attributes=True)
         with pytest.raises(TypeError, match='deserializing string'):
             deserialize(donation_json_obj, string_input=True, deserialize_private_attributes=True)
 
@@ -134,7 +134,7 @@ def test_donation_list_serialization():
     new_list = deserialize(json_list)
     assert new_list == mock.donations
 
-    json_list = serialize(mock.donations, serialize_private_attributes=True, output_as_string=True)
+    json_list = serialize(mock.donations, serialize_private_attributes=True, string_output=True)
     new_list = deserialize(json_list, deserialize_private_attributes=True, string_input=True)
     assert new_list == mock.donations
 
@@ -152,7 +152,7 @@ def test_donation_dict_serialization():
 
     assert obj == new_obj
 
-    json_obj = serialize(obj, output_as_string=True)
+    json_obj = serialize(obj, string_output=True)
     new_obj = deserialize(json_obj, string_input=True)
 
     assert obj == new_obj
