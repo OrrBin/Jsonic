@@ -71,3 +71,12 @@ These custom serializers are used in the process of serializing `serializable ty
 Used to register custom deserializer for specific type.
 
 These custom deserializers are used in the process of deserializing `representation of serializable type`
+
+## Jsonic current limitations
+There are few obvious limitations to ’Jsonic’ and a few more subtle ones.
+
+- Most obvious limitation is that only instances of ’serializable type’s can be serialized.
+The immediate effect is that when we want to serialize from external source we need to manually register it and all its nested object types.
+- Jsonic is meant mostly to serialize ’data objects’, and have some technical limitations:
+    - If a class has __init__ method parameters which are positional-only parameters, it is not ’serializable type’ even if it meets all other conditions.
+    This is because when deserilizing a ’representation of serializable type’ an instance of the given type must be created. TO_BE_CONTINUED
