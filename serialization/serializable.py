@@ -50,7 +50,6 @@ class Serializable:
         If nested objects exists in such class, their type should be one of the following:
             1. Implement Serializable
             2. Be registered using the register_serializable_type function
-
     """
 
     serializable_types: Dict[str, SerializableTypeData] = {}
