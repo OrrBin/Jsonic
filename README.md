@@ -1,7 +1,31 @@
 # Jsonic: pythonic utility for JSON Serialization
 
-Jsonic is a lightweight utility for serializing/deserializing python objects to/from JSON.
+`Jsonic` is a lightweight utility for serializing/deserializing python objects to/from JSON.
 
+`Jsonic` targets mainly serialization of `data classes`, and aims to make serialization of such classes smooth and painless process.
+As a serialization layer on top of your DB layer, or serialization layer for your custom communication protocol
+between python micro-services it can do magics
+
+Nevertheless, Jsonic might not be the right tool for serializing your super complex (and awesome) custom data structure to json 
+(although you could probably do it with some extra work)
+
+
+## Jsonic Features
+- serialize any `jsonic type` to `jsonic representation`
+    - For classes that extends `Serializable` or are registered using `register_serializable_type` you could 
+    declare instance attributes as transient, so they won't take place in the serialization process
+    - You could create your own custom serializer for a specific type using `@jsonic_serializer` decorator
+    - You can choose to serialize to `python generic dict` or to `JSON string`
+    - You can choose to leave private attributes out of the serialization process  
+- deserialize `jsonic representation` to `jsonic type` instance
+    - For classes that extends `Serializable` or are registered using `register_serializable_type` you could 
+    create mapping from `__init__` parameter name to it's corresponding instance attribute name. 
+    If not mapped, it is assumed `__init__` parameter has instance attribute with the same name
+    - You could deserialize any `Jsonic representation` whether it is `python generic dict` or `JSON string`
+    - You could pass the expected deserialized instance type to `deserialize` function for type safety. 
+    if the serialized instance was of another type, an error will be thrown
+    - You can choose to leave private attributes out of the deserialization process  
+    
 ## Jsonic components
 
 ##### Definition: `jsonic type`  
