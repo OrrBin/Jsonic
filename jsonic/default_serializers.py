@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from serialization import jsonic_serializer, jsonic_deserializer
+from jsonic import jsonic_serializer, jsonic_deserializer
 
 """This Module contains default serializer and deserializer for some types"""
 

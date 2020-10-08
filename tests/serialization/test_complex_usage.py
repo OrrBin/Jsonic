@@ -3,7 +3,7 @@ from datetime import datetime
 import pytest
 
 import tests.serialization.mock as mock
-from serialization import serialize, deserialize
+from jsonic import serialize, deserialize
 from tests.serialization.model import Product, Donation
 
 

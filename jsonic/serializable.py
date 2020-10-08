@@ -3,8 +3,8 @@ import inspect
 import json
 from typing import List, Dict
 
-from serialization.decorators import _JsonicSerializer, _JsonicDeserializer
-from serialization.util import full_type_name, is_private_attribute
+from jsonic.decorators import _JsonicSerializer, _JsonicDeserializer
+from jsonic.util import full_type_name, is_private_attribute
 
 SERIALIZED_TYPE_ATTRIBUTE_NAME = '_serialized_type'
 

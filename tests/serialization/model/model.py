@@ -1,6 +1,6 @@
 from typing import List
 
-from serialization import Serializable, register_jsonic_type
+from jsonic import Serializable, register_jsonic_type
 
 
 class AttributeProfile(Serializable):

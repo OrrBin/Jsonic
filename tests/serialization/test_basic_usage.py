@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from serialization import *
+from jsonic import *
 
 
 class Address:

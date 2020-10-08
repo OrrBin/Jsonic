@@ -1,6 +1,7 @@
 .idea
 .env/
 .venv/*
+.build/
 .pytest_cache/
 docs/build/
 sample.mind.gz

@@ -1,7 +1,7 @@
 from datetime import datetime
 import random
 
-from serialization import register_jsonic_type
+from jsonic import register_jsonic_type
 from tests.serialization.model import *
 from tests.serialization.model import ContactDetails
 
