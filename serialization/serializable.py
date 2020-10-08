@@ -3,18 +3,18 @@ import inspect
 import json
 from typing import List, Dict
 
-from serialization.decorators import _Serializer, _Deserializer
+from serialization.decorators import _JsonicSerializer, _JsonicDeserializer
 from serialization.util import full_type_name
 
 SERIALIZED_TYPE_ATTRIBUTE_NAME = '_serialized_type'
 
 
-class SerializableTypeData:
+class JsonicTypeData:
     """
     Class holding meta-data used for serializing and deserializing for a specific type
 
     Attributes:
-        cls (type): The serializable type
+        cls (type): The jsonic type
         transient_attributes (List[str]): list of attribute names that won't be serialized and deserialized
         init_parameters_mapping: (Dict[str, str]): mapping from __init__ parameter name to it's matching instance attribute
     """
@@ -50,10 +50,10 @@ class Serializable:
     Note:
         If nested objects exists in such class, their type should be one of the following:
             1. Implement Serializable
-            2. Be registered using the register_serializable_type function
+            2. Be registered using the register_jsonic_type function
     """
 
-    serializable_types: Dict[str, SerializableTypeData] = {}
+    jsonic_types: Dict[str, JsonicTypeData] = {}
     transient_attributes: List[str] = None
     init_parameters_mapping: Dict[str, str] = None
 
@@ -61,7 +61,7 @@ class Serializable:
         super().__init__()
 
     def __init_subclass__(cls) -> None:
-        register_serializable_type(cls, cls.transient_attributes, cls.init_parameters_mapping)
+        register_jsonic_type(cls, cls.transient_attributes, cls.init_parameters_mapping)
 
 
 def serialize(obj, serialize_private_attributes=False, string_output=False):
@@ -77,7 +77,7 @@ def serialize(obj, serialize_private_attributes=False, string_output=False):
         ``dictionary`` / ``json string`` representing the input
 
     Note:
-        Only class instances of classes extending ``Serializable`` or registered using ``register_serializable_type`` can be serialized
+        Only class instances of classes extending ``Serializable`` or registered using ``register_jsonic_type`` can be serialized
     """
     json_str = json.dumps(obj, default=lambda o: _serialize_object(o, serialize_private_attributes))
     return json_str if string_output else json.loads(json_str)
@@ -106,7 +106,7 @@ def deserialize(obj, deserialize_private_attributes: bool = False, string_input:
     if type(obj) == list:
         return _deserialize_list(obj, expected_type=expected_type, deserialize_private_attributes=deserialize_private_attributes)
     elif type(obj) == dict:
-        if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj and obj[SERIALIZED_TYPE_ATTRIBUTE_NAME] in _Deserializer.deserializers:
+        if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj and obj[SERIALIZED_TYPE_ATTRIBUTE_NAME] in _JsonicDeserializer.deserializers:
             # There is custom deserializer for given objects serialized type, so use it
             return _deserialize_with_custom_deserializer(obj, expected_type=expected_type)
         return _deserialize_dict(obj, expected_type=expected_type, deserialize_private_attributes=deserialize_private_attributes)
@@ -114,10 +114,10 @@ def deserialize(obj, deserialize_private_attributes: bool = False, string_input:
         return obj
 
 
-def register_serializable_type(cls, transient_attributes: List[str] = None,
-                               init_parameters_mapping: Dict[str, str] = None):
+def register_jsonic_type(cls, transient_attributes: List[str] = None,
+                         init_parameters_mapping: Dict[str, str] = None):
     """
-    Registers serializable type with it's metadata.
+    Registers jsonic type with it's metadata.
     Can be used to register classes that doesn't extend ``Serializable``, from example classes from external source.
     Only registered classes, classes extending ``Serializable`` or classes that a custom serializer and deserializer were registered for
     can be serialized using ``serialize`` function and deserialized using ``deserialized`` function
@@ -128,21 +128,21 @@ def register_serializable_type(cls, transient_attributes: List[str] = None,
         init_parameters_mapping: (Dict[str, str]): mapping from __init__ parameter name to it's matching instance attribute
     """
     class_name = full_type_name(cls)
-    Serializable.serializable_types[class_name] = SerializableTypeData(cls, transient_attributes,
-                                                                       init_parameters_mapping)
+    Serializable.jsonic_types[class_name] = JsonicTypeData(cls, transient_attributes,
+                                                                 init_parameters_mapping)
 
 
 def _serialize_object(obj, serialize_private_attributes=False):
     typ = type(obj)
-    if typ in _Serializer.serializers:
-        value = _Serializer.serializers[typ](obj)
+    if typ in _JsonicSerializer.serializers:
+        value = _JsonicSerializer.serializers[typ](obj)
         value[SERIALIZED_TYPE_ATTRIBUTE_NAME] = typ.__name__
         return value
 
     elif hasattr(obj, '__dict__'):
         type_name = full_type_name(typ)
-        is_serializable_type = type_name in Serializable.serializable_types
-        type_data = Serializable.serializable_types[type_name] if is_serializable_type else None
+        is_jsonic_type = type_name in Serializable.jsonic_types
+        type_data = Serializable.jsonic_types[type_name] if is_jsonic_type else None
         ignored_attributes = {}
 
         if not serialize_private_attributes:  # Do not serialize private attributes
@@ -174,9 +174,9 @@ def _deserialize_with_custom_deserializer(obj, expected_type: type = None):
         type_name = obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
         if expected_type and full_type_name(expected_type) != type_name:
             raise AttributeError(f'Deserializing type {type_name}, which is not the expected type: {expected_type}')
-        if type_name in _Deserializer.deserializers:
+        if type_name in _JsonicDeserializer.deserializers:
             del obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
-            result = _Deserializer.deserializers[type_name](obj)
+            result = _JsonicDeserializer.deserializers[type_name](obj)
             obj[SERIALIZED_TYPE_ATTRIBUTE_NAME] = type_name
             return result
 
@@ -202,7 +202,7 @@ def _deserialize_generic_dict(obj: dict, deserialize_private_attributes: bool = 
     for key, value in obj.items():
         if (type(value) == dict and SERIALIZED_TYPE_ATTRIBUTE_NAME in value) or type(value) == list:
             deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
-        elif type(value) == dict:  # value is is a dict but not serializable type dict
+        elif type(value) == dict:  # value is is a dict but not jsonic type dict
             deserialized_dict[key] = _deserialize_generic_dict(value, deserialize_private_attributes=deserialize_private_attributes)
         else:
             deserialized_dict[key] = value
@@ -211,8 +211,8 @@ def _deserialize_generic_dict(obj: dict, deserialize_private_attributes: bool = 
 
 
 def get_type_by_name(type_name: str):
-    if type_name in Serializable.serializable_types:
-        return Serializable.serializable_types[type_name].cls
+    if type_name in Serializable.jsonic_types:
+        return Serializable.jsonic_types[type_name].cls
 
     last_index = type_name.rindex('.')
     module_name = type_name[0:last_index]
@@ -223,10 +223,10 @@ def get_type_by_name(type_name: str):
 
 def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=False, expected_type: type = None):
     if SERIALIZED_TYPE_ATTRIBUTE_NAME not in obj:
-        raise TypeError(f'Deserializing dict of serializable type but could not find {SERIALIZED_TYPE_ATTRIBUTE_NAME} attribute')
+        raise TypeError(f'Deserializing dict of jsonic type but could not find {SERIALIZED_TYPE_ATTRIBUTE_NAME} attribute')
 
     type_name = obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
-    is_jsonic_type = type_name in Serializable.serializable_types
+    is_jsonic_type = type_name in Serializable.jsonic_types
     cls = get_type_by_name(type_name)
 
     if expected_type and full_type_name(expected_type) != type_name:
@@ -250,7 +250,7 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
 
     sign = inspect.signature(cls.__init__)
 
-    init_parameters_mapping = Serializable.serializable_types[type_name].init_parameters_mapping if is_jsonic_type else {}
+    init_parameters_mapping = Serializable.jsonic_types[type_name].init_parameters_mapping if is_jsonic_type else {}
 
     for parameter_name, parameter_data in sign.parameters.items():
         if not deserialize_private_attributes and parameter_name.startswith('_'):
@@ -265,7 +265,7 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
         else:  # assuming parameter has same name as corresponding attribute
             if parameter_name not in deserialized_dict:
                 raise AttributeError(f'Missing attribute in given dict to match __init__ parameter: {parameter_name}.\n'
-                                     f'If relevant, consider registering type "{type_name}" using "register_serializable_type" '
+                                     f'If relevant, consider registering type "{type_name}" using "register_jsonic_type" '
                                      f'and providing required "init_parameters_mapping".')
             init_dict[parameter_name] = deserialized_dict[parameter_name]
 

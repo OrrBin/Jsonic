@@ -12,7 +12,7 @@ class Address:
         return f'Address({self.city}, {self.street})'
 
 
-register_serializable_type(Address)
+register_jsonic_type(Address)
 
 
 class ContactDetails(Serializable):

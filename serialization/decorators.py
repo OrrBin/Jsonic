@@ -1,5 +1,5 @@
 # wrap Serializer to allow for deferred calling
-def serializer(serialized_type):
+def jsonic_serializer(serialized_type):
     """
     Decorator that registers serializer function for a specific type
     serializer function must return the dictionary with string keys.
@@ -25,12 +25,12 @@ def serializer(serialized_type):
    """
 
     def wrapper(function):
-        return _Serializer(function, serialized_type)
+        return _JsonicSerializer(function, serialized_type)
 
     return wrapper
 
 
-def deserializer(deserialized_type_name):
+def jsonic_deserializer(deserialized_type_name):
     """
     Decorator that registers deserializer function for a specific type
     deserializer function must return the type it is registered with.
@@ -56,29 +56,29 @@ def deserializer(deserialized_type_name):
     """
 
     def wrapper(function):
-        return _Deserializer(function, deserialized_type_name)
+        return _JsonicDeserializer(function, deserialized_type_name)
 
     return wrapper
 
 
-class _Serializer:
+class _JsonicSerializer:
     serializers = dict()
 
     def __init__(self, function, serialized_type):
         self.function = function
-        _Serializer.serializers[serialized_type] = function
+        _JsonicSerializer.serializers[serialized_type] = function
 
     def __call__(self, *args, **kwargs):
         return self.function(*args, **kwargs)
 
 
-class _Deserializer:
+class _JsonicDeserializer:
     deserializers = dict()
 
     def __init__(self, function, deserialized_type_name):
         self.function = function
 
-        _Deserializer.deserializers[deserialized_type_name.__name__] = function
+        _JsonicDeserializer.deserializers[deserialized_type_name.__name__] = function
 
     def __call__(self, *args, **kwargs):
         return self.function(*args, **kwargs)

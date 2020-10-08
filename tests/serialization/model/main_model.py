@@ -1,7 +1,7 @@
 from datetime import datetime
 import random
 
-from serialization import register_serializable_type
+from serialization import register_jsonic_type
 from tests.serialization.model import *
 
 
@@ -27,7 +27,7 @@ class UserCredentials:
 
 
 # Register UserCredentials which represents class from another module that does not implement Serializable
-register_serializable_type(UserCredentials, init_parameters_mapping={'exp': 'expiration_time'})
+register_jsonic_type(UserCredentials, init_parameters_mapping={'exp': 'expiration_time'})
 
 
 class User(Serializable):
