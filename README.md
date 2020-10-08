@@ -112,18 +112,21 @@ of serialization work in general.
 - Most obvious limitation is that only instances of `jsonic type`'s can be serialized.
 This means there are classes that cannot be serialized and deserialized using Jsonic
 - Jsonic is meant mostly to serialize `data classes`, and have some technical limitations:
-    - If a class `__init__` method has parameters it gets but not persisting as an attribute, it is not `jsonic type` even if it meets
-     all there conditions.
-     This is because when deserializing a `jsonic representation` an instance of the given type must be created.
-     We need to pass to the constructor the corresponding attributes. Therefore if there are parameters it gets and are not 
-     being persisted into an instance attribute we won't be able to pass them when creating the instance.
-        - Example: A class gets in it's construction some service class instance, and in it's instance construction
+    - **constructor with temporary parameters**: If a class constructor has parameters it gets but does persist as an instance attribute, 
+    it is not `jsonic type` even if it meets all there conditions.
+    This is because when deserializing a `jsonic representation` an instance of the given type is created.
+    We need to pass to the constructor the corresponding instance attributes. Therefore if there are parameters it gets and are not 
+    being persisted into an instance attribute we won't be able to pass them when creating the instance.
+    - Example: A class gets in it's construction some service class instance, and in it's instance construction
         it calls a method of that service, but does not persist this service instance. 
         `Jsonic` won't be able to deserialize this class properly.     
-    - If a class `__init__` method has parameters which are `positional-only` parameters, it is not `jsonic type` even if it meets
+    - **constructor with positional-only args**: If a class constructor method has parameters which are `positional-only` parameters, it is not `jsonic type` even if it meets
     all other conditions.
-    This is because when deserializing a `jsonic representation` an instance of the given type must be created.
+    This is because when deserializing a `jsonic representation` an instance of the given type is created.
     We need to pass to the constructor the corresponding attributes. We can pass only keyword arguments which correspond to 
     an instance attribute.
-    - `*args and **kwargs`: if a class `__init__` method accepts *args or **kwargs, in many cases `Jsonic` won't be able to
-     deserialize it properly
+    - **constructor with `*args and **kwargs`**: if a class constructor method accepts *args or **kwargs, in many cases `Jsonic` won't be able to
+    deserialize it properly
+    - **constructor with side effects**: When deserializing `jsonic representaion` an instance of the given type is created.
+        We don't have the original values that were passed to the constructor, so we pass the corresponding instance attributes instead. 
+        so if the constructor has side effects that depend on the parameters it gets we might get unexpected results when deserializng.
