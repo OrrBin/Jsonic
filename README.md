@@ -9,7 +9,7 @@ between python micro-services it can do magics
 Nevertheless, Jsonic might not be the right tool for serializing your super complex (and awesome) custom data structure to json 
 (although you could probably do it with some extra work)
 
-### Definitions
+## Definitions
 
 Some definitions that are used in the rest of this file
 
