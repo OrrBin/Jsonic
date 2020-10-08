@@ -4,7 +4,7 @@ import json
 from typing import List, Dict
 
 from serialization.decorators import _JsonicSerializer, _JsonicDeserializer
-from serialization.util import full_type_name
+from serialization.util import full_type_name, is_private_attribute
 
 SERIALIZED_TYPE_ATTRIBUTE_NAME = '_serialized_type'
 
@@ -129,7 +129,7 @@ def register_jsonic_type(cls, transient_attributes: List[str] = None,
     """
     class_name = full_type_name(cls)
     Serializable.jsonic_types[class_name] = JsonicTypeData(cls, transient_attributes,
-                                                                 init_parameters_mapping)
+                                                           init_parameters_mapping)
 
 
 def _serialize_object(obj, serialize_private_attributes=False):
@@ -253,7 +253,7 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
     init_parameters_mapping = Serializable.jsonic_types[type_name].init_parameters_mapping if is_jsonic_type else {}
 
     for parameter_name, parameter_data in sign.parameters.items():
-        if not deserialize_private_attributes and parameter_name.startswith('_'):
+        if not deserialize_private_attributes and is_private_attribute(parameter_name):
             continue
         if parameter_name == 'self':
             pass
@@ -269,13 +269,12 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
                                      f'and providing required "init_parameters_mapping".')
             init_dict[parameter_name] = deserialized_dict[parameter_name]
 
-    attributes_not_to_constructor = {}
-    for candidate in deserialized_dict.keys():
-        if candidate not in sign.parameters:
-            attributes_not_to_constructor[candidate] = deserialized_dict[candidate]
-
     created_instance = cls(**init_dict)
-    for attr_name, attr_value in attributes_not_to_constructor.items():
+
+    # After creating the instance, set all it's attributes to deserialized value
+    for attr_name, attr_value in deserialized_dict.items():
+        if not deserialize_private_attributes and is_private_attribute(attr_name):
+            continue
         setattr(created_instance, attr_name, attr_value)
 
     return created_instance
