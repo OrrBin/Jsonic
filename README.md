@@ -90,14 +90,8 @@ Most common usage is for classes from external source that you want to serialize
 ### serialize function
 Serializes ``jsonic type`` into ``jsonic representaion`` representing the input
 
-#### Note:
-Only ``jsonic type`` can be serialized using this function
-
 ### deserialize function
 Deserializes `jsonic representaion` to instance of jsonic type
-
-#### Note:
-Only ``jsonic representation`` can be deserialized using this function
 
 ### @jsonic_serializer Decorator
 Used to register custom serializer for specific type.
