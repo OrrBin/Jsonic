@@ -1,10 +1,11 @@
 .idea
 .env/
 .venv/*
-.build/*
 .pytest_cache/
 docs/build/
 sample.mind.gz
 /venv/
 /helping/core/helping_pb2.py
 /helping.proto
+/build/
+/dist/
