@@ -54,7 +54,7 @@ class User(Serializable):
 class Product:
 
     def __init__(self, product_id: str, user_id: str, description: str, profile: CategoryProfile,
-                 time: datetime, amount: Amount = Amount(1)):
+                 time: datetime, amount: Amount = Amount(amount=complex(2, -3))):
         super().__init__()
 
         self.product_id = product_id

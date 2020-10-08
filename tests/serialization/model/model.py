@@ -14,9 +14,6 @@ class AttributeProfile(Serializable):
             return NotImplemented
         return self.attribute_id == o.attribute_id and self.values == o.values
 
-    def __ne__(self, o: object) -> bool:
-        return not self == o
-
 
 class CategoryProfile(Serializable):
     def __init__(self, category_id: str, attributes: List[AttributeProfile]):
@@ -29,12 +26,9 @@ class CategoryProfile(Serializable):
             return NotImplemented
         return self.category_id == o.category_id and self.attributes == o.attributes
 
-    def __ne__(self, o: object) -> bool:
-        return not self == o
-
 
 class Amount(Serializable):
-    def __init__(self, amount: int):
+    def __init__(self, amount: complex):
         super().__init__()
         self.amount = amount
 
@@ -42,9 +36,6 @@ class Amount(Serializable):
         if not isinstance(o, Amount):
             return NotImplemented
         return self.amount == o.amount
-
-    def __ne__(self, o: object) -> bool:
-        return not self == o
 
 
 class Coordinate:
@@ -58,9 +49,6 @@ class Coordinate:
         if not isinstance(o, Coordinate):
             return NotImplemented
         return self.longitude == o.longitude and self.latitude == o.latitude
-
-    def __ne__(self, o: object) -> bool:
-        return not self == o
 
 
 register_jsonic_type(Coordinate, init_parameters_mapping={'lat': 'latitude', 'lon': 'longitude'})
@@ -76,9 +64,6 @@ class Address(Serializable):
             return NotImplemented
         return self.address == o.address
 
-    def __ne__(self, o: object) -> bool:
-        return not self == o
-
 
 class Location:
     def __init__(self, coord: Coordinate, address: Address):
@@ -91,9 +76,6 @@ class Location:
             return NotImplemented
         return self.coord == o.coord and self.address == o.address
 
-    def __ne__(self, o: object) -> bool:
-        return not self == o
-
 
 class ContactDetails:
     def __init__(self, phone_number: str, email: str):
@@ -105,6 +87,3 @@ class ContactDetails:
         if not isinstance(o, ContactDetails):
             return NotImplemented
         return self.phone_number == o.phone_number and self.email == o.email
-
-    def __ne__(self, o: object) -> bool:
-        return not self == o
