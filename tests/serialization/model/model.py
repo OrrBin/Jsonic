@@ -1,6 +1,6 @@
 from typing import List
 
-from serialization import Serializable
+from serialization import Serializable, register_jsonic_type
 
 
 class AttributeProfile(Serializable):
@@ -47,11 +47,12 @@ class Amount(Serializable):
         return not self == o
 
 
-class Coordinate(Serializable):
-    def __init__(self, longitude: float, latitude: float):
+class Coordinate:
+
+    def __init__(self, lon: float, lat: float):
         super().__init__()
-        self.longitude = longitude
-        self.latitude = latitude
+        self.longitude = lon
+        self.latitude = lat
 
     def __eq__(self, o: object) -> bool:
         if not isinstance(o, Coordinate):
@@ -60,6 +61,9 @@ class Coordinate(Serializable):
 
     def __ne__(self, o: object) -> bool:
         return not self == o
+
+
+register_jsonic_type(Coordinate, init_parameters_mapping={'lat': 'latitude', 'lon': 'longitude'})
 
 
 class Address(Serializable):
@@ -76,7 +80,7 @@ class Address(Serializable):
         return not self == o
 
 
-class Location(Serializable):
+class Location:
     def __init__(self, coord: Coordinate, address: Address):
         super().__init__()
         self.coord = coord

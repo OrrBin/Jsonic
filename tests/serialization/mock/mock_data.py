@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List
 
 from tests.serialization.model import Product, CategoryProfile, User, Amount, Donation, AttributeProfile, Coordinate, \
-    UserCredentials, ContactDetails
+    UserCredentials, ContactDetails, Location, Address
 
 users: List[User] = [
     User(user_id='user_1', birth_time=datetime(1995, 7, 5, 0),
@@ -46,11 +46,11 @@ products: List[Product] = [
 
 donations: List[Donation] = [
     Donation('donation_1', 'user_1', ['product_1', 'product_2'],
-             location=Coordinate(latitude=32.0853, longitude=34.7818), time=datetime(2020, 1, 1, 10, 5, 35),
+             location=Location(coord=Coordinate(lat=32.0853, lon=34.7818), address=Address(address='Tel Aviv')), time=datetime(2020, 1, 1, 10, 5, 35),
              contact=ContactDetails(email='orr.bob@hotmail.com', phone_number='0509999999')),
     Donation('donation_2', 'user_2', ['product_3', 'product_6'],
-             location=Coordinate(latitude=33.0853, longitude=34.7818), time=datetime(2020, 2, 2, 10, 5, 35),
+             location=Coordinate(lat=33.0853, lon=34.7818), time=datetime(2020, 2, 2, 10, 5, 35),
              contact=ContactDetails(email='orrbenyamini@gmail.com', phone_number='0508888888')),
     Donation('donation_3', 'user_3', ['product_4', 'product_5'],
-             location=Coordinate(latitude=34.0853, longitude=34.7818), time=datetime(2020, 3, 3, 10, 5, 35)),
+             location=Location(coord=Coordinate(lat=32.0853, lon=34.7818), address=Address(address='Tel Aviv')), time=datetime(2020, 3, 3, 10, 5, 35)),
 ]

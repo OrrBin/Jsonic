@@ -3,6 +3,7 @@ import random
 
 from serialization import register_jsonic_type
 from tests.serialization.model import *
+from tests.serialization.model import ContactDetails
 
 
 class UserCredentials:
@@ -72,7 +73,7 @@ class Product:
 
 class Donation(Serializable):
     def __init__(self, donation_id: str, user_id: str, product_ids: List[str], time: datetime, description: str = '',
-                 contact: ContactDetails = None, address: Address = None, location: Coordinate = None, **kwargs):
+                 contact: ContactDetails = None, address: Address = None, location: Location = None, **kwargs):
         super().__init__()
         self.donation_id = donation_id
         self.user_id = user_id
