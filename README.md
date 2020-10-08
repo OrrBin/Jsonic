@@ -117,7 +117,7 @@ This means there are classes that cannot be serialized and deserialized using Js
     This is because when deserializing a `jsonic representation` an instance of the given type is created.
     We need to pass to the constructor the corresponding instance attributes. Therefore if there are parameters it gets and are not 
     being persisted into an instance attribute we won't be able to pass them when creating the instance.
-    - Example: A class gets in it's construction some service class instance, and in it's instance construction
+        - Example: A class gets in it's construction some service class instance, and in it's instance construction
         it calls a method of that service, but does not persist this service instance. 
         `Jsonic` won't be able to deserialize this class properly.     
     - **constructor with positional-only args**: If a class constructor method has parameters which are `positional-only` parameters, it is not `jsonic type` even if it meets
