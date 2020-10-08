@@ -125,7 +125,7 @@ This means there are classes that cannot be serialized and deserialized using Js
     This is because when deserializing a `jsonic representation` an instance of the given type is created.
     We need to pass to the constructor the corresponding attributes. We can pass only keyword arguments which correspond to 
     an instance attribute.
-    - **constructor with `*args and **kwargs`**: if a class constructor method accepts *args or **kwargs, in many cases `Jsonic` won't be able to
+    - **constructor with `*args` and `**kwargs`**: if a class constructor method accepts *args or **kwargs, in many cases `Jsonic` won't be able to
     deserialize it properly
     - **constructor with side effects**: When deserializing `jsonic representaion` an instance of the given type is created.
         We don't have the original values that were passed to the constructor, so we pass the corresponding instance attributes instead. 
