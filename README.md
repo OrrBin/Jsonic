@@ -76,9 +76,8 @@ When deserializing class instance, the corresponding instance attribute will be 
 For `__init__` parameter which has no mapping defined, it is assumed that the corresponding instance variable has
 the same name as the parameter.
 
-
-#### Note:
-Any nested object in such class must be of `jsonic type`
+##### Note:
+All instance attributes of that class must be of `jsonic type`
 
 ### register_serializable_type function
 Used to register classes that don't extend the `Serializable` class, and are not `data class`,
