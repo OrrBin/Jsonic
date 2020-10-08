@@ -91,7 +91,7 @@ class Location(Serializable):
         return not self == o
 
 
-class ContactDetails(Serializable):
+class ContactDetails:
     def __init__(self, phone_number: str, email: str):
         super().__init__()
         self.phone_number = phone_number

@@ -1,3 +1,4 @@
+import importlib
 import inspect
 import json
 from typing import List, Dict
@@ -140,10 +141,8 @@ def _serialize_object(obj, serialize_private_attributes=False):
 
     elif hasattr(obj, '__dict__'):
         type_name = full_type_name(typ)
-        if type_name not in Serializable.serializable_types:
-            raise TypeError(f'Could not find registered serializable type with name: {type_name}')
-
-        type_data = Serializable.serializable_types[type_name]
+        is_serializable_type = type_name in Serializable.serializable_types
+        type_data = Serializable.serializable_types[type_name] if is_serializable_type else None
         ignored_attributes = {}
 
         if not serialize_private_attributes:  # Do not serialize private attributes
@@ -152,13 +151,13 @@ def _serialize_object(obj, serialize_private_attributes=False):
                 ignored_attributes[key] = getattr(obj, key)
                 delattr(obj, key)
 
-        if type_data.transient_attributes:  # Do not serialize transient attributes
+        if type_data and type_data.transient_attributes:  # Do not serialize transient attributes
             to_remove = [key for key in obj.__dict__.keys() if key in type_data.transient_attributes]
             for key in to_remove:
                 ignored_attributes[key] = getattr(obj, key)
                 delattr(obj, key)
 
-        setattr(obj, SERIALIZED_TYPE_ATTRIBUTE_NAME, full_type_name(typ))
+        setattr(obj, SERIALIZED_TYPE_ATTRIBUTE_NAME, type_name)
         result = {}
         for key, value in obj.__dict__.items():
             result[key] = value
@@ -188,8 +187,8 @@ def _deserialize_with_custom_deserializer(obj, expected_type: type = None):
 
 def _deserialize_dict(obj: dict, deserialize_private_attributes=False, expected_type: type = None):
     if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj:
-        return _deserialize_serializable_type_dict(obj, deserialize_private_attributes=deserialize_private_attributes,
-                                                   expected_type=expected_type)
+        return _deserialize_jsonic_type_dict(obj, deserialize_private_attributes=deserialize_private_attributes,
+                                             expected_type=expected_type)
 
     return _deserialize_generic_dict(obj, deserialize_private_attributes=deserialize_private_attributes, expected_type=expected_type)
 
@@ -211,12 +210,24 @@ def _deserialize_generic_dict(obj: dict, deserialize_private_attributes: bool = 
     return deserialized_dict
 
 
-def _deserialize_serializable_type_dict(obj: dict, deserialize_private_attributes=False, expected_type: type = None):
+def get_type_by_name(type_name: str):
+    if type_name in Serializable.serializable_types:
+        return Serializable.serializable_types[type_name].cls
+
+    last_index = type_name.rindex('.')
+    module_name = type_name[0:last_index]
+    cls_name = type_name[last_index + 1:]
+    module = importlib.import_module(module_name)
+    return getattr(module, cls_name)
+
+
+def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=False, expected_type: type = None):
     if SERIALIZED_TYPE_ATTRIBUTE_NAME not in obj:
         raise TypeError(f'Deserializing dict of serializable type but could not find {SERIALIZED_TYPE_ATTRIBUTE_NAME} attribute')
 
     type_name = obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
-    cls = Serializable.serializable_types[type_name].cls
+    is_jsonic_type = type_name in Serializable.serializable_types
+    cls = get_type_by_name(type_name)
 
     if expected_type and full_type_name(expected_type) != type_name:
         raise AttributeError(f'Deserializing type {type_name}, which is not the expected type: {expected_type}')
@@ -239,7 +250,7 @@ def _deserialize_serializable_type_dict(obj: dict, deserialize_private_attribute
 
     sign = inspect.signature(cls.__init__)
 
-    init_parameters_mapping = Serializable.serializable_types[type_name].init_parameters_mapping
+    init_parameters_mapping = Serializable.serializable_types[type_name].init_parameters_mapping if is_jsonic_type else {}
 
     for parameter_name, parameter_data in sign.parameters.items():
         if not deserialize_private_attributes and parameter_name.startswith('_'):
@@ -252,6 +263,10 @@ def _deserialize_serializable_type_dict(obj: dict, deserialize_private_attribute
         elif parameter_name in init_parameters_mapping:
             init_dict[parameter_name] = deserialized_dict[init_parameters_mapping[parameter_name]]
         else:  # assuming parameter has same name as corresponding attribute
+            if parameter_name not in deserialized_dict:
+                raise AttributeError(f'Missing attribute in given dict to match __init__ parameter: {parameter_name}.\n'
+                                     f'If relevant, consider registering type "{type_name}" using "register_serializable_type" '
+                                     f'and providing required "init_parameters_mapping".')
             init_dict[parameter_name] = deserialized_dict[parameter_name]
 
     attributes_not_to_constructor = {}
