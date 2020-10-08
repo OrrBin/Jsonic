@@ -70,12 +70,12 @@ Deserializes `jsonic representaion` to instance of jsonic type
 #### Note:
 Only ``jsonic representation`` can be deserialized using this function
 
-### @serializer Decorator
+### @jsonic_serializer Decorator
 Used to register custom serializer for specific type.
 
 These custom serializers are used in the process of serializing `jsonic type`   
 
-### @deserializer Decorator
+### @jsonic_deserializer Decorator
 Used to register custom deserializer for specific type.
 
 These custom deserializers are used in the process of deserializing `jsonic representation`
