@@ -28,6 +28,42 @@ Nevertheless, Jsonic might not be the right tool for serializing your super comp
      new_user : User = deserialize(obj) # new_user is a new instance of user with same attributes
       
 
+#### More advanced usage example
+    
+    from jsonic import Serializable, register_jsonic_type, serialize, deserialize
+    
+    class UserCredentials:
+    """
+    Represents class from some other module, which does not extends Serializable
+    We can register it using register_serializable_type function
+    """
+
+    def __init__(self, token: str, exp: datetime):
+        self.token = token
+        self.expiration_time = exp
+        self.calculatedAttr = random.uniform(0, 1)
+
+    # Register UserCredentials which represents class from another module that does not implement Serializable
+    # exp __init__ parameter is mapped to expiration_time instace attribute
+    register_jsonic_type(UserCredentials, init_parameters_mapping={'exp': 'expiration_time'})
+
+
+    class User(Serializable):
+        transient_attributes = ['user_calculated_attr'] # user_calculated_attr won't be serialized and deserialzied
+        init_parameters_mapping = {'id': 'user_id'} # id __init__ parameter is mapped to user_id instace attribute
+
+        def __init__(self, user_id: str, birth_time: datetime, user_credentials: UserCredentials, *args):
+            super().__init__()
+            self.user_id = user_id
+            self.birth_time = birth_time
+            self.user_credentials = user_credentials
+            self.user_calculated_attr = 'user_calculated_attr'
+            
+    user = User(user_id='user_1', birth_time=datetime(1995, 7, 5, 0),
+         user_credentials=UserCredentials(token='token', exp=datetime(2020, 11, 1, 0)))
+         
+    user_json_obj = serialize(user, string_output=True)
+    new_user = deserialize(user_json_obj, string_input=True, expected_type=User)
 
 
 ## Definitions
