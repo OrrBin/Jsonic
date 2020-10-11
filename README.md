@@ -9,6 +9,27 @@ between python micro-services it can do magics
 Nevertheless, Jsonic might not be the right tool for serializing your super complex (and awesome) custom data structure to json 
 (although you could probably do it with some extra work)
 
+# Install and basic usage
+#### Install
+    pip install py-jsonic
+   
+#### Basic usage example 
+    
+    from jsonic import serialize, deserialize
+    
+    class User:
+        def __init__(self, user_id: str, birth_time: datetime):
+            super().__init__()
+            self.user_id = user_id
+            self.birth_time = birth_time
+           
+     user = User('id1', datetime(2020,10,11))      
+     obj = serialize(user) # {'user_id': 'id1', 'birth_time': {'datetime': '2020-10-11 00:00:00', '_serialized_type': 'datetime'}, '_serialized_type': 'User'}
+     new_user : User = deserialize(obj) # new_user is a new instance of user with same attributes
+      
+
+
+
 ## Definitions
 
 Some definitions that are used in the rest of this file
