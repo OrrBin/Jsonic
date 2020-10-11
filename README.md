@@ -42,7 +42,7 @@ Supported forms of representations:
 ## Jsonic Features
 - serialize any `jsonic type` to `jsonic representation`
     - For classes that extends `Serializable` or are registered using `register_serializable_type` you could 
-    declare instance attributes as transient, so they won't take place in the serialization process
+    declare instance attributes as transient, so they won't participate in the serialization process
     - You could create your own custom serializer for a specific type using `@jsonic_serializer` decorator
     - You can choose to serialize to `python generic dict` or to `JSON string`
     - You can choose to leave private attributes out of the serialization process  
@@ -52,14 +52,13 @@ Supported forms of representations:
     If not mapped, it is assumed `__init__` parameter has instance attribute with the same name
     - You could deserialize any `Jsonic representation` whether it is `python generic dict` or `JSON string`
     - You could pass the expected deserialized instance type to `deserialize` function for type safety. 
-    if the serialized instance was of another type, an error will be thrown
+    if the serialized instance was of another type, an error will be raised
     - You can choose to leave private attributes out of the deserialization process  
     
 ## Jsonic components
 
 ### Serializable class
-Classes extending `Serializable` can be serialized into json dict/string representing the object,
-and deserialized back to class instance.
+Class extending `Serializable` can be serialized into json dict/string representing the object, and deserialized back to class instance.
 Extending classes can declare some attributes as transient. To do so they should have
 class attribute:
 
@@ -67,7 +66,7 @@ class attribute:
     
 which should be a list of attributes names that would be transient (won't be serialized and deserialized)
 
-Classes that has `__init__` parameter with a different name than it's corresponding instance attribute should have class attribute:
+Class that has `__init__` parameter with a different name than it's corresponding instance attribute should have class attribute:
 
     init_parameters_mapping: Dict[str, str]
     
@@ -76,15 +75,11 @@ When deserializing class instance, the corresponding instance attribute will be 
 For `__init__` parameter which has no mapping defined, it is assumed that the corresponding instance variable has
 the same name as the parameter.
 
-##### Note:
-All instance attributes of that class must be of `jsonic type`
-
 ### register_serializable_type function
-Used to register classes that don't extend the `Serializable` class, and are not `data class`,
-therefore optional meta-data is required for them.
+Used to register classes that don't extend the `Serializable` class, and are not `data class`, therefore optional meta-data is required for them.
 
 This is equivalent to extending `Serializable`, but extending `Serializable` is preferred when possible. 
-Most common usage is for classes from external source that you want to serialize, but is a `jsonic type`
+Most common usage is for classes from external source that you want to serialize, and need to declare some attributes transient or init parameter mapping.
 
 ### serialize function
 Serializes ``jsonic type`` into ``jsonic representaion`` representing the input
@@ -106,21 +101,20 @@ These custom deserializers are used in the process of deserializing `jsonic repr
 There are few obvious limitations to `Jsonic` and a few more subtle ones.
 The main source of those limitations is the nature of serialization process in general.
 The main focus of `Jsonic` is serialization of `data classes`, which represents big chunk 
-of serialization work in general.
+of common serialization scenarios.
 
 - Most obvious limitation is that only instances of `jsonic type`'s can be serialized.
-This means there are classes that cannot be serialized and deserialized using Jsonic
+This means there are classes that cannot be serialized and deserialized correctly using Jsonic
 - Jsonic is meant mostly to serialize `data classes`, and have some technical limitations:
     - **constructor with temporary parameters**: If a class constructor has parameters it gets but does persist as an instance attribute, 
-    it is not `jsonic type` even if it meets all there conditions.
+    it is not `jsonic type` even if it meets all other conditions.
     This is because when deserializing a `jsonic representation` an instance of the given type is created.
     We need to pass to the constructor the corresponding instance attributes. Therefore if there are parameters it gets and are not 
     being persisted into an instance attribute we won't be able to pass them when creating the instance.
         - Example: A class gets in it's construction some service class instance, and in it's instance construction
         it calls a method of that service, but does not persist this service instance. 
         `Jsonic` won't be able to deserialize this class properly.     
-    - **constructor with positional-only args**: If a class constructor method has parameters which are `positional-only` parameters, it is not `jsonic type` even if it meets
-    all other conditions.
+    - **constructor with positional-only parameters**: If a class constructor method has parameters which are `positional-only` parameters, it is not `jsonic type` even if it meets all other conditions.
     This is because when deserializing a `jsonic representation` an instance of the given type is created.
     We need to pass to the constructor the corresponding attributes. We can pass only keyword arguments which correspond to 
     an instance attribute.
