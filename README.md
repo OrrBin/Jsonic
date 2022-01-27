@@ -17,7 +17,7 @@ Nevertheless, Jsonic might not be the right tool for serializing your super comp
     
     from jsonic import serialize, deserialize
     
-    class User:
+    class User(Serializable):
         def __init__(self, user_id: str, birth_time: datetime):
             super().__init__()
             self.user_id = user_id
