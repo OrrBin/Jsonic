@@ -9,3 +9,8 @@ sample.mind.gz
 /helping.proto
 /build/
 /dist/
+__pycache__/
+*.pyc
+*.pyo
+.coverage
+htmlcov/
