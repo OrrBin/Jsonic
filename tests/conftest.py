@@ -1,7 +1,7 @@
 """Shared fixtures and configuration for all tests"""
 import pytest
-from datetime import datetime
-from jsonic import Serializable, register_jsonic_type
+
+from jsonic import Serializable
 from jsonic.decorators import _JsonicSerializer, _JsonicDeserializer
 
 

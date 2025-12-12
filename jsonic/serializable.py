@@ -1,12 +1,46 @@
 import importlib
 import inspect
 import json
+from enum import Enum
 from typing import List, Dict
 
 from jsonic.decorators import _JsonicSerializer, _JsonicDeserializer
 from jsonic.util import full_type_name, is_private_attribute
 
 SERIALIZED_TYPE_ATTRIBUTE_NAME = '_serialized_type'
+
+
+class EnumEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles Enum types"""
+    def encode(self, obj):
+        # Pre-process to convert all enums before encoding
+        obj = self._convert_enums(obj)
+        return super().encode(obj)
+    
+    def _convert_enums(self, obj):
+        """Recursively convert all enum instances"""
+        if isinstance(obj, Enum):
+            return {
+                'name': obj.name,
+                'value': obj.value,
+                SERIALIZED_TYPE_ATTRIBUTE_NAME: full_type_name(type(obj))
+            }
+        elif isinstance(obj, dict):
+            return {k: self._convert_enums(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._convert_enums(item) for item in obj]
+        elif isinstance(obj, tuple):
+            return tuple(self._convert_enums(item) for item in obj)
+        return obj
+    
+    def default(self, obj):
+        if isinstance(obj, Enum):
+            return {
+                'name': obj.name,
+                'value': obj.value,
+                SERIALIZED_TYPE_ATTRIBUTE_NAME: full_type_name(type(obj))
+            }
+        return super().default(obj)
 
 
 class JsonicTypeData:
@@ -79,7 +113,12 @@ def serialize(obj, serialize_private_attributes=False, string_output=False):
     Note:
         Only class instances of classes extending ``Serializable`` or registered using ``register_jsonic_type`` can be serialized
     """
-    json_str = json.dumps(obj, default=lambda o: _serialize_object(o, serialize_private_attributes))
+    # Pre-process enums before json.dumps (IntEnum would be treated as int otherwise)
+    if isinstance(obj, Enum):
+        obj = _serialize_object(obj, serialize_private_attributes)
+    
+    # Use custom encoder that handles nested enums
+    json_str = json.dumps(obj, cls=EnumEncoder, default=lambda o: _serialize_object(o, serialize_private_attributes))
     return json_str if string_output else json.loads(json_str)
 
 
@@ -134,6 +173,15 @@ def register_jsonic_type(cls, transient_attributes: List[str] = None,
 
 def _serialize_object(obj, serialize_private_attributes=False):
     typ = type(obj)
+    
+    # Check if it's an Enum
+    if isinstance(obj, Enum):
+        return {
+            'name': obj.name,
+            'value': obj.value,
+            SERIALIZED_TYPE_ATTRIBUTE_NAME: full_type_name(typ)
+        }
+    
     if typ in _JsonicSerializer.serializers:
         value = _JsonicSerializer.serializers[typ](obj)
         value[SERIALIZED_TYPE_ATTRIBUTE_NAME] = typ.__name__
@@ -160,7 +208,10 @@ def _serialize_object(obj, serialize_private_attributes=False):
         setattr(obj, SERIALIZED_TYPE_ATTRIBUTE_NAME, type_name)
         result = {}
         for key, value in obj.__dict__.items():
-            result[key] = value
+            if isinstance(value, Enum):
+                result[key] = _serialize_object(value, serialize_private_attributes)
+            else:
+                result[key] = value
         for key, val in ignored_attributes.items():
             setattr(obj, key, val)
 
@@ -232,6 +283,15 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
     if expected_type and full_type_name(expected_type) != type_name:
         raise AttributeError(f'Deserializing type {type_name}, which is not the expected type: {expected_type}')
 
+    # Check if it's an Enum
+    if isinstance(cls, type) and issubclass(cls, Enum):
+        # Deserialize enum by name (more reliable than value for aliases)
+        # For combined flags, name might be None, use value instead
+        if obj['name'] is not None:
+            return cls[obj['name']]
+        else:
+            return cls(obj['value'])
+
     deserialized_dict = {}
 
     for key, value in obj.items():
@@ -241,8 +301,11 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
             pass
         elif type(value) == list:
             deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
-        elif type(value) == dict and SERIALIZED_TYPE_ATTRIBUTE_NAME in value:
-            deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
+        elif type(value) == dict:
+            if SERIALIZED_TYPE_ATTRIBUTE_NAME in value:
+                deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
+            else:
+                deserialized_dict[key] = _deserialize_generic_dict(value, deserialize_private_attributes=deserialize_private_attributes)
         else:
             deserialized_dict[key] = value
 
