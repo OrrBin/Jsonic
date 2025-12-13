@@ -117,18 +117,10 @@ def serialize(obj, serialize_private_attributes=False, string_output=False):
     # Pre-process everything recursively - this handles tuples, sets, and all objects
     try:
         obj = _preprocess_for_serialization(obj, serialize_private_attributes)
-    except SerializationError:
+    except (SerializationError, ValueError):
         raise
-    except RecursionError as e:
-        raise ValueError("Circular reference detected during serialization")
-    except SerializationError:
-
-        raise
-
     except RecursionError:
-
         raise ValueError("Circular reference detected during serialization")
-
     except (TypeError, Exception) as e:
         raise SerializationError(str(e), "")
     
@@ -153,18 +145,10 @@ def _preprocess_for_serialization(obj, serialize_private_attributes=False, path=
         for i, item in enumerate(obj):
             try:
                 result.append(_preprocess_for_serialization(item, serialize_private_attributes, f"{path}[{i}]" if path else f"[{i}]"))
-            except SerializationError:
+            except (SerializationError, ValueError):
                 raise
             except RecursionError:
                 raise ValueError("Circular reference detected during serialization")
-            except SerializationError:
-
-                raise
-
-            except RecursionError:
-
-                raise ValueError("Circular reference detected during serialization")
-
             except (TypeError, Exception) as e:
                 raise SerializationError(str(e), f"{path}[{i}]" if path else f"[{i}]")
         return result
@@ -175,18 +159,10 @@ def _preprocess_for_serialization(obj, serialize_private_attributes=False, path=
         for k, v in obj.items():
             try:
                 result[k] = _preprocess_for_serialization(v, serialize_private_attributes, f"{path}.{k}" if path else k)
-            except SerializationError:
+            except (SerializationError, ValueError):
                 raise
             except RecursionError:
                 raise ValueError("Circular reference detected during serialization")
-            except SerializationError:
-
-                raise
-
-            except RecursionError:
-
-                raise ValueError("Circular reference detected during serialization")
-
             except (TypeError, Exception) as e:
                 raise SerializationError(str(e), f"{path}.{k}" if path else k)
         return result
@@ -309,18 +285,10 @@ def _serialize_object(obj, serialize_private_attributes=False, path=""):
                 try:
                     # Recursively serialize all values
                     result[key] = _preprocess_for_serialization(value, serialize_private_attributes, f"{path}.{key}" if path else key)
-                except SerializationError:
+                except (SerializationError, ValueError):
                     raise
                 except RecursionError:
                     raise ValueError("Circular reference detected during serialization")
-                except SerializationError:
-
-                    raise
-
-                except RecursionError:
-
-                    raise ValueError("Circular reference detected during serialization")
-
                 except (TypeError, Exception) as e:
                     raise SerializationError(str(e), f"{path}.{key}" if path else key)
             for key, val in ignored_attributes.items():
@@ -345,10 +313,6 @@ def _serialize_object(obj, serialize_private_attributes=False, path=""):
                         result[slot] = _preprocess_for_serialization(value, serialize_private_attributes, f"{path}.{slot}" if path else slot)
                     except SerializationError:
                         raise
-                    except SerializationError:
-
-                        raise
-
                     except RecursionError:
 
                         raise ValueError("Circular reference detected during serialization")
@@ -381,12 +345,8 @@ def _serialize_object(obj, serialize_private_attributes=False, path=""):
             try:
                 # Recursively serialize all values
                 result[key] = _preprocess_for_serialization(value, serialize_private_attributes, f"{path}.{key}" if path else key)
-            except SerializationError:
+            except (SerializationError, ValueError):
                 raise
-            except SerializationError:
-
-                raise
-
             except RecursionError:
 
                 raise ValueError("Circular reference detected during serialization")
@@ -407,12 +367,8 @@ def _serialize_object(obj, serialize_private_attributes=False, path=""):
                     value = getattr(obj, slot)
                     # Recursively serialize all values
                     result[slot] = _preprocess_for_serialization(value, serialize_private_attributes, f"{path}.{slot}" if path else slot)
-                except SerializationError:
+                except (SerializationError, ValueError):
                     raise
-                except SerializationError:
-
-                    raise
-
                 except RecursionError:
 
                     raise ValueError("Circular reference detected during serialization")

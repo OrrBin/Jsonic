@@ -16,6 +16,6 @@ class SerializationError(JsonicError, TypeError):
     pass
 
 
-class DeserializationError(JsonicError, TypeError):
+class DeserializationError(JsonicError, TypeError, AttributeError):
     """Error during deserialization with path context."""
     pass
