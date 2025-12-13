@@ -6,6 +6,7 @@ from typing import List, Dict
 
 from jsonic.decorators import _JsonicSerializer, _JsonicDeserializer
 from jsonic.util import full_type_name, is_private_attribute
+from jsonic.exceptions import SerializationError, DeserializationError
 
 SERIALIZED_TYPE_ATTRIBUTE_NAME = '_serialized_type'
 
@@ -113,28 +114,97 @@ def serialize(obj, serialize_private_attributes=False, string_output=False):
     Note:
         Only class instances of classes extending ``Serializable`` or registered using ``register_jsonic_type`` can be serialized
     """
-    # Pre-process tuples recursively
-    obj = _preprocess_tuples(obj, serialize_private_attributes)
+    # Pre-process everything recursively - this handles tuples, sets, and all objects
+    try:
+        obj = _preprocess_for_serialization(obj, serialize_private_attributes)
+    except SerializationError:
+        raise
+    except RecursionError as e:
+        raise ValueError("Circular reference detected during serialization")
+    except SerializationError:
+
+        raise
+
+    except RecursionError:
+
+        raise ValueError("Circular reference detected during serialization")
+
+    except (TypeError, Exception) as e:
+        raise SerializationError(str(e), "")
     
     # Use custom encoder that handles nested enums
-    json_str = json.dumps(obj, cls=EnumEncoder, default=lambda o: _serialize_object(o, serialize_private_attributes))
+    json_str = json.dumps(obj, cls=EnumEncoder)
     return json_str if string_output else json.loads(json_str)
 
 
-def _preprocess_tuples(obj, serialize_private_attributes=False):
-    """Recursively convert tuples and sets to serializable dict format."""
+def _preprocess_for_serialization(obj, serialize_private_attributes=False, path=""):
+    """Recursively preprocess all objects for serialization."""
+    # Handle primitives
+    if obj is None or isinstance(obj, (bool, int, float, str)):
+        return obj
+    
+    # Handle tuples and sets
     if isinstance(obj, (tuple, set)):
-        return _serialize_object(obj, serialize_private_attributes)
-    elif isinstance(obj, list):
-        return [_preprocess_tuples(item, serialize_private_attributes) for item in obj]
-    elif isinstance(obj, dict):
-        return {k: _preprocess_tuples(v, serialize_private_attributes) for k, v in obj.items()}
-    elif isinstance(obj, Enum):
-        return _serialize_object(obj, serialize_private_attributes)
-    return obj
+        return _serialize_object(obj, serialize_private_attributes, path)
+    
+    # Handle lists
+    if isinstance(obj, list):
+        result = []
+        for i, item in enumerate(obj):
+            try:
+                result.append(_preprocess_for_serialization(item, serialize_private_attributes, f"{path}[{i}]" if path else f"[{i}]"))
+            except SerializationError:
+                raise
+            except RecursionError:
+                raise ValueError("Circular reference detected during serialization")
+            except SerializationError:
+
+                raise
+
+            except RecursionError:
+
+                raise ValueError("Circular reference detected during serialization")
+
+            except (TypeError, Exception) as e:
+                raise SerializationError(str(e), f"{path}[{i}]" if path else f"[{i}]")
+        return result
+    
+    # Handle dicts
+    if isinstance(obj, dict):
+        result = {}
+        for k, v in obj.items():
+            try:
+                result[k] = _preprocess_for_serialization(v, serialize_private_attributes, f"{path}.{k}" if path else k)
+            except SerializationError:
+                raise
+            except RecursionError:
+                raise ValueError("Circular reference detected during serialization")
+            except SerializationError:
+
+                raise
+
+            except RecursionError:
+
+                raise ValueError("Circular reference detected during serialization")
+
+            except (TypeError, Exception) as e:
+                raise SerializationError(str(e), f"{path}.{k}" if path else k)
+        return result
+    
+    # Handle enums
+    if isinstance(obj, Enum):
+        return _serialize_object(obj, serialize_private_attributes, path)
+    
+    # Handle all other objects
+    return _serialize_object(obj, serialize_private_attributes, path)
 
 
-def deserialize(obj, deserialize_private_attributes: bool = False, string_input: bool = False, expected_type: type = None):
+def _preprocess_tuples(obj, serialize_private_attributes=False, path=""):
+    """Legacy function - redirects to _preprocess_for_serialization."""
+    return _preprocess_for_serialization(obj, serialize_private_attributes, path)
+
+
+def deserialize(obj, deserialize_private_attributes: bool = False, string_input: bool = False, expected_type: type = None, _path: str = ""):
     """
     Deserializes dictionary/json string representing dictionary, that was returned by ``serialize`` function call on an object
 
@@ -143,6 +213,7 @@ def deserialize(obj, deserialize_private_attributes: bool = False, string_input:
         deserialize_private_attributes (bool): should deserialize private attributes (attributes which their name starts with ``_``)
         string_input (bool): is the input of type ``json string``, or ``dict``
         expected_type: the deserialized result expected type
+        _path: internal parameter for tracking path (not for external use)
     Returns:
         object / class instance / dict / list, depending on the serialized input
 
@@ -152,10 +223,10 @@ def deserialize(obj, deserialize_private_attributes: bool = False, string_input:
     if string_input:
         if type(obj) != str:
             raise TypeError(f'deserializing string, but input was not of type str. given input: {obj}')
-        return deserialize(json.loads(obj), expected_type=expected_type, deserialize_private_attributes=deserialize_private_attributes)
+        return deserialize(json.loads(obj), expected_type=expected_type, deserialize_private_attributes=deserialize_private_attributes, _path=_path)
 
     if type(obj) == list:
-        return _deserialize_list(obj, expected_type=expected_type, deserialize_private_attributes=deserialize_private_attributes)
+        return _deserialize_list(obj, expected_type=expected_type, deserialize_private_attributes=deserialize_private_attributes, path=_path)
     elif type(obj) == dict:
         # Check for tuple/set markers first
         if obj.get('_is_tuple') and 'tuple' in _JsonicDeserializer.deserializers:
@@ -164,8 +235,8 @@ def deserialize(obj, deserialize_private_attributes: bool = False, string_input:
             return _JsonicDeserializer.deserializers['set'](obj)
         if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj and obj[SERIALIZED_TYPE_ATTRIBUTE_NAME] in _JsonicDeserializer.deserializers:
             # There is custom deserializer for given objects serialized type, so use it
-            return _deserialize_with_custom_deserializer(obj, expected_type=expected_type)
-        return _deserialize_dict(obj, expected_type=expected_type, deserialize_private_attributes=deserialize_private_attributes)
+            return _deserialize_with_custom_deserializer(obj, expected_type=expected_type, path=_path)
+        return _deserialize_dict(obj, expected_type=expected_type, deserialize_private_attributes=deserialize_private_attributes, path=_path)
     else:
         return obj
 
@@ -188,7 +259,8 @@ def register_jsonic_type(cls, transient_attributes: List[str] = None,
                                                            init_parameters_mapping)
 
 
-def _serialize_object(obj, serialize_private_attributes=False):
+def _serialize_object(obj, serialize_private_attributes=False, path=""):
+    """Serialize an object with path tracking for better error messages."""
     typ = type(obj)
     
     # Check if it's an Enum
@@ -234,12 +306,23 @@ def _serialize_object(obj, serialize_private_attributes=False):
             setattr(obj, SERIALIZED_TYPE_ATTRIBUTE_NAME, type_name)
             result = {}
             for key, value in obj.__dict__.items():
-                if isinstance(value, Enum):
-                    result[key] = _serialize_object(value, serialize_private_attributes)
-                elif isinstance(value, (tuple, set)):
-                    result[key] = _serialize_object(value, serialize_private_attributes)
-                else:
-                    result[key] = value
+                try:
+                    # Recursively serialize all values
+                    result[key] = _preprocess_for_serialization(value, serialize_private_attributes, f"{path}.{key}" if path else key)
+                except SerializationError:
+                    raise
+                except RecursionError:
+                    raise ValueError("Circular reference detected during serialization")
+                except SerializationError:
+
+                    raise
+
+                except RecursionError:
+
+                    raise ValueError("Circular reference detected during serialization")
+
+                except (TypeError, Exception) as e:
+                    raise SerializationError(str(e), f"{path}.{key}" if path else key)
             for key, val in ignored_attributes.items():
                 setattr(obj, key, val)
 
@@ -256,22 +339,36 @@ def _serialize_object(obj, serialize_private_attributes=False):
                     if type_data.transient_attributes and slot in type_data.transient_attributes:
                         continue
                     
-                    value = getattr(obj, slot)
-                    if isinstance(value, Enum):
-                        result[slot] = _serialize_object(value, serialize_private_attributes)
-                    elif isinstance(value, (tuple, set)):
-                        result[slot] = _serialize_object(value, serialize_private_attributes)
-                    else:
-                        result[slot] = value
+                    try:
+                        value = getattr(obj, slot)
+                        # Recursively serialize all values
+                        result[slot] = _preprocess_for_serialization(value, serialize_private_attributes, f"{path}.{slot}" if path else slot)
+                    except SerializationError:
+                        raise
+                    except SerializationError:
+
+                        raise
+
+                    except RecursionError:
+
+                        raise ValueError("Circular reference detected during serialization")
+
+                    except (TypeError, Exception) as e:
+                        raise SerializationError(str(e), f"{path}.{slot}" if path else slot)
             return result
     
     # Priority 3: Type resolvers (dataclass=50, typehinted=25)
     from jsonic.type_resolver import get_resolver_for_type
     resolver = get_resolver_for_type(typ)
     if resolver:
-        result = resolver.serialize(obj, serialize_private_attributes)
-        result[SERIALIZED_TYPE_ATTRIBUTE_NAME] = type_name
-        return result
+        try:
+            result = resolver.serialize(obj, serialize_private_attributes)
+            result[SERIALIZED_TYPE_ATTRIBUTE_NAME] = type_name
+            return result
+        except (TypeError, SerializationError) as e:
+            if isinstance(e, SerializationError):
+                raise
+            raise SerializationError(str(e), path)
     
     # Fallback: Generic object with __dict__ or __slots__
     if hasattr(obj, '__dict__'):
@@ -281,12 +378,21 @@ def _serialize_object(obj, serialize_private_attributes=False):
             # Skip private attributes if requested (but not _serialized_type)
             if not serialize_private_attributes and key.startswith('_') and key != SERIALIZED_TYPE_ATTRIBUTE_NAME:
                 continue
-            if isinstance(value, Enum):
-                result[key] = _serialize_object(value, serialize_private_attributes)
-            elif isinstance(value, (tuple, set)):
-                result[key] = _serialize_object(value, serialize_private_attributes)
-            else:
-                result[key] = value
+            try:
+                # Recursively serialize all values
+                result[key] = _preprocess_for_serialization(value, serialize_private_attributes, f"{path}.{key}" if path else key)
+            except SerializationError:
+                raise
+            except SerializationError:
+
+                raise
+
+            except RecursionError:
+
+                raise ValueError("Circular reference detected during serialization")
+
+            except (TypeError, Exception) as e:
+                raise SerializationError(str(e), f"{path}.{key}" if path else key)
         return result
     elif hasattr(obj, '__slots__'):
         # Handle __slots__ classes
@@ -297,16 +403,25 @@ def _serialize_object(obj, serialize_private_attributes=False):
                 # Skip private attributes if requested
                 if not serialize_private_attributes and slot.startswith('_'):
                     continue
-                value = getattr(obj, slot)
-                if isinstance(value, Enum):
-                    result[slot] = _serialize_object(value, serialize_private_attributes)
-                elif isinstance(value, (tuple, set)):
-                    result[slot] = _serialize_object(value, serialize_private_attributes)
-                else:
-                    result[slot] = value
+                try:
+                    value = getattr(obj, slot)
+                    # Recursively serialize all values
+                    result[slot] = _preprocess_for_serialization(value, serialize_private_attributes, f"{path}.{slot}" if path else slot)
+                except SerializationError:
+                    raise
+                except SerializationError:
+
+                    raise
+
+                except RecursionError:
+
+                    raise ValueError("Circular reference detected during serialization")
+
+                except (TypeError, Exception) as e:
+                    raise SerializationError(str(e), f"{path}.{slot}" if path else slot)
         return result
 
-    raise TypeError(f'Could not find serializer for type: {typ}')
+    raise SerializationError(f'Could not find serializer for type: {typ}', path)
 
 
 def _get_all_slots(cls):
@@ -323,45 +438,50 @@ def _get_all_slots(cls):
     return slots
 
 
-def _deserialize_with_custom_deserializer(obj, expected_type: type = None):
+def _deserialize_with_custom_deserializer(obj, expected_type: type = None, path=""):
     if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj:
         type_name = obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
         if expected_type and full_type_name(expected_type) != type_name:
-            raise AttributeError(f'Deserializing type {type_name}, which is not the expected type: {expected_type}')
+            raise DeserializationError(f'Deserializing type {type_name}, which is not the expected type: {expected_type}', path)
         if type_name in _JsonicDeserializer.deserializers:
             del obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
             result = _JsonicDeserializer.deserializers[type_name](obj)
             obj[SERIALIZED_TYPE_ATTRIBUTE_NAME] = type_name
             return result
 
-        raise TypeError(f'Could not find custom deserializer for object with type tag: {type_name}')
+        raise DeserializationError(f'Could not find custom deserializer for object with type tag: {type_name}', path)
 
-    raise TypeError(f'Missing attribute _serialized_type for object: {obj}')
+    raise DeserializationError(f'Missing attribute _serialized_type for object: {obj}', path)
 
 
-def _deserialize_dict(obj: dict, deserialize_private_attributes=False, expected_type: type = None):
+def _deserialize_dict(obj: dict, deserialize_private_attributes=False, expected_type: type = None, path=""):
     if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj:
         return _deserialize_jsonic_type_dict(obj, deserialize_private_attributes=deserialize_private_attributes,
-                                             expected_type=expected_type)
+                                             expected_type=expected_type, path=path)
 
-    return _deserialize_generic_dict(obj, deserialize_private_attributes=deserialize_private_attributes, expected_type=expected_type)
+    return _deserialize_generic_dict(obj, deserialize_private_attributes=deserialize_private_attributes, expected_type=expected_type, path=path)
 
 
-def _deserialize_generic_dict(obj: dict, deserialize_private_attributes: bool = False, expected_type: type = None):
+def _deserialize_generic_dict(obj: dict, deserialize_private_attributes: bool = False, expected_type: type = None, path=""):
     if expected_type and expected_type != dict:
-        raise AttributeError(f'Deserializing type dict, which is not the expected type: {expected_type}')
+        raise DeserializationError(f'Deserializing type dict, which is not the expected type: {expected_type}', path)
 
     deserialized_dict = {}
 
     for key, value in obj.items():
-        if type(value) == dict and (SERIALIZED_TYPE_ATTRIBUTE_NAME in value or value.get('_is_tuple') or value.get('_is_set')):
-            deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
-        elif type(value) == list:
-            deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
-        elif type(value) == dict:  # value is is a dict but not jsonic type dict
-            deserialized_dict[key] = _deserialize_generic_dict(value, deserialize_private_attributes=deserialize_private_attributes)
-        else:
-            deserialized_dict[key] = value
+        try:
+            if type(value) == dict and (SERIALIZED_TYPE_ATTRIBUTE_NAME in value or value.get('_is_tuple') or value.get('_is_set')):
+                deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes, _path=f"{path}.{key}" if path else key)
+            elif type(value) == list:
+                deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes, _path=f"{path}.{key}" if path else key)
+            elif type(value) == dict:  # value is is a dict but not jsonic type dict
+                deserialized_dict[key] = _deserialize_generic_dict(value, deserialize_private_attributes=deserialize_private_attributes, path=f"{path}.{key}" if path else key)
+            else:
+                deserialized_dict[key] = value
+        except (TypeError, AttributeError, DeserializationError) as e:
+            if isinstance(e, DeserializationError):
+                raise
+            raise DeserializationError(str(e), f"{path}.{key}" if path else key)
 
     return deserialized_dict
 
@@ -391,16 +511,16 @@ def get_type_by_name(type_name: str):
         raise TypeError(f'Could not find type: {type_name}')
 
 
-def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=False, expected_type: type = None):
+def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=False, expected_type: type = None, path=""):
     if SERIALIZED_TYPE_ATTRIBUTE_NAME not in obj:
-        raise TypeError(f'Deserializing dict of jsonic type but could not find {SERIALIZED_TYPE_ATTRIBUTE_NAME} attribute')
+        raise DeserializationError(f'Deserializing dict of jsonic type but could not find {SERIALIZED_TYPE_ATTRIBUTE_NAME} attribute', path)
 
     type_name = obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
     is_jsonic_type = type_name in Serializable.jsonic_types
     cls = get_type_by_name(type_name)
 
     if expected_type and full_type_name(expected_type) != type_name:
-        raise AttributeError(f'Deserializing type {type_name}, which is not the expected type: {expected_type}')
+        raise DeserializationError(f'Deserializing type {type_name}, which is not the expected type: {expected_type}', path)
 
     # Check if it's an Enum
     if isinstance(cls, type) and issubclass(cls, Enum):
@@ -473,9 +593,9 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
                 if parameter_data.default != inspect.Parameter.empty:
                     continue
             if parameter_name not in deserialized_dict:
-                raise AttributeError(f'Missing attribute in given dict to match __init__ parameter: {parameter_name}.\n'
+                raise DeserializationError(f'Missing attribute in given dict to match __init__ parameter: {parameter_name}.\n'
                                      f'If relevant, consider registering type "{type_name}" using "register_jsonic_type" '
-                                     f'and providing required "init_parameters_mapping".')
+                                     f'and providing required "init_parameters_mapping".', path)
             init_dict[parameter_name] = deserialized_dict[parameter_name]
 
     created_instance = cls(**init_dict)
@@ -492,11 +612,16 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
     return created_instance
 
 
-def _deserialize_list(lst: list, deserialize_private_attributes=False, expected_type: type = None):
+def _deserialize_list(lst: list, deserialize_private_attributes=False, expected_type: type = None, path=""):
     if expected_type and expected_type != list:
-        raise AttributeError(f'Deserializing list, which is not the expected type: {expected_type}')
+        raise DeserializationError(f'Deserializing list, which is not the expected type: {expected_type}', path)
     deserialized_list = []
-    for element in lst:
-        deserialized_list.append(deserialize(element, deserialize_private_attributes=deserialize_private_attributes))
+    for i, element in enumerate(lst):
+        try:
+            deserialized_list.append(deserialize(element, deserialize_private_attributes=deserialize_private_attributes, _path=f"{path}[{i}]" if path else f"[{i}]"))
+        except (TypeError, AttributeError, DeserializationError) as e:
+            if isinstance(e, DeserializationError):
+                raise
+            raise DeserializationError(str(e), f"{path}[{i}]" if path else f"[{i}]")
 
     return deserialized_list

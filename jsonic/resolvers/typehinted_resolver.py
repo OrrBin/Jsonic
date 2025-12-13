@@ -22,7 +22,7 @@ class TypeHintedResolver(TypeResolver):
     
     def serialize(self, obj: Any, serialize_private_attributes: bool = True) -> Dict[str, Any]:
         """Serialize object by extracting __dict__ or __slots__, handling tuples and sets."""
-        from jsonic.serializable import _serialize_object, _get_all_slots, _preprocess_tuples
+        from jsonic.serializable import _preprocess_for_serialization, _get_all_slots
         result = {}
         
         # Handle both __dict__ and __slots__
@@ -31,13 +31,8 @@ class TypeHintedResolver(TypeResolver):
                 # Skip private attributes if requested
                 if not serialize_private_attributes and key.startswith('_'):
                     continue
-                if isinstance(value, (tuple, set)):
-                    result[key] = _serialize_object(value, serialize_private_attributes)
-                elif isinstance(value, (list, dict)):
-                    # Recursively preprocess lists and dicts for nested tuples/sets
-                    result[key] = _preprocess_tuples(value)
-                else:
-                    result[key] = value
+                # Recursively serialize all values
+                result[key] = _preprocess_for_serialization(value, serialize_private_attributes, key)
         elif hasattr(obj, '__slots__'):
             slots = _get_all_slots(type(obj))
             for slot in slots:
@@ -46,13 +41,8 @@ class TypeHintedResolver(TypeResolver):
                     if not serialize_private_attributes and slot.startswith('_'):
                         continue
                     value = getattr(obj, slot)
-                    if isinstance(value, (tuple, set)):
-                        result[slot] = _serialize_object(value, serialize_private_attributes)
-                    elif isinstance(value, (list, dict)):
-                        # Recursively preprocess lists and dicts for nested tuples/sets
-                        result[slot] = _preprocess_tuples(value)
-                    else:
-                        result[slot] = value
+                    # Recursively serialize all values
+                    result[slot] = _preprocess_for_serialization(value, serialize_private_attributes, slot)
         
         return result
     
