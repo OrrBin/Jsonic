@@ -442,6 +442,37 @@ def _deserialize_generic_dict(obj: dict, deserialize_private_attributes: bool = 
     return deserialized_dict
 
 
+def _find_similar_types(type_name: str, max_suggestions: int = 5):
+    """Find similar registered type names using fuzzy matching."""
+    from difflib import get_close_matches
+    
+    # Get all registered type names
+    registered_types = list(Serializable.jsonic_types.keys())
+    
+    if not registered_types:
+        return []
+    
+    # Try exact case-insensitive match first
+    type_name_lower = type_name.lower()
+    for registered in registered_types:
+        if registered.lower() == type_name_lower:
+            return [registered]
+    
+    # Try fuzzy matching on full names
+    matches = get_close_matches(type_name, registered_types, n=max_suggestions, cutoff=0.6)
+    
+    # Also try matching just the class name (last part after dot)
+    if '.' in type_name:
+        class_name = type_name.split('.')[-1]
+        for registered in registered_types:
+            if '.' in registered:
+                registered_class = registered.split('.')[-1]
+                if class_name.lower() == registered_class.lower() and registered not in matches:
+                    matches.insert(0, registered)
+    
+    return matches[:max_suggestions]
+
+
 def get_type_by_name(type_name: str):
     if type_name in Serializable.jsonic_types:
         return Serializable.jsonic_types[type_name].cls
@@ -453,7 +484,7 @@ def get_type_by_name(type_name: str):
         cls_name = type_name[last_index + 1:]
         module = importlib.import_module(module_name)
         return getattr(module, cls_name)
-    except (AttributeError, ValueError):
+    except (AttributeError, ValueError, ModuleNotFoundError) as e:
         # Class might be defined locally (e.g., in a test function)
         # Try to find it in the type resolver's internal cache
         if cls_name:
@@ -464,7 +495,37 @@ def get_type_by_name(type_name: str):
                     cls = frame_locals[cls_name]
                     if inspect.isclass(cls) and full_type_name(cls) == type_name:
                         return cls
-        raise TypeError(f'Could not find type: {type_name}')
+        
+        # Build helpful error message with suggestions
+        error_parts = [f'Could not find type: {type_name}']
+        
+        # Find similar types
+        similar = _find_similar_types(type_name)
+        if similar:
+            error_parts.append('\n\nDid you mean one of these?')
+            for suggestion in similar:
+                error_parts.append(f'  - {suggestion}')
+        
+        # Add common causes
+        error_parts.append('\n\nCommon causes:')
+        if '.' in type_name:
+            error_parts.append(f"  - Module '{module_name}' not imported")
+        else:
+            error_parts.append('  - Class defined locally (not accessible for deserialization)')
+        error_parts.append('  - Typo in class name')
+        error_parts.append('  - Class not registered with register_jsonic_type()')
+        
+        # Show some registered types if available
+        registered_types = list(Serializable.jsonic_types.keys())
+        if registered_types and not similar:
+            error_parts.append(f'\n\nRegistered types ({len(registered_types)} total):')
+            # Show first 5
+            for reg_type in registered_types[:5]:
+                error_parts.append(f'  - {reg_type}')
+            if len(registered_types) > 5:
+                error_parts.append(f'  ... and {len(registered_types) - 5} more')
+        
+        raise TypeError(''.join(error_parts))
 
 
 def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=False, expected_type: type = None, path=""):
