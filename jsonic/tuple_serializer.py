@@ -19,7 +19,6 @@ def serialize_tuple(obj: tuple) -> dict:
 def deserialize_tuple(obj: dict) -> tuple:
     """Deserialize dict back to tuple."""
     from jsonic.serializable import deserialize
-    # Recursively deserialize items to handle nested tuples
-    items = [deserialize(item) if isinstance(item, dict) and item.get('_is_tuple') else item 
-             for item in obj['items']]
+    # Recursively deserialize all items
+    items = [deserialize(item) for item in obj['items']]
     return tuple(items)

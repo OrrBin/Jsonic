@@ -14,13 +14,13 @@ class DataclassResolver(TypeResolver):
         return dataclasses.is_dataclass(cls)
     
     def serialize(self, obj: Any) -> Dict[str, Any]:
-        """Serialize a dataclass instance, handling enums specially."""
+        """Serialize a dataclass instance, handling enums and tuples specially."""
         from jsonic.serializable import _serialize_object
         result = {}
         for field in dataclasses.fields(obj):
             value = getattr(obj, field.name)
-            # Recursively serialize enums
-            if isinstance(value, Enum):
+            # Recursively serialize enums and tuples
+            if isinstance(value, (Enum, tuple)):
                 result[field.name] = _serialize_object(value)
             else:
                 result[field.name] = value

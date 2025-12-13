@@ -113,15 +113,25 @@ def serialize(obj, serialize_private_attributes=False, string_output=False):
     Note:
         Only class instances of classes extending ``Serializable`` or registered using ``register_jsonic_type`` can be serialized
     """
-    # Pre-process enums and tuples before json.dumps
-    if isinstance(obj, Enum):
-        obj = _serialize_object(obj, serialize_private_attributes)
-    elif isinstance(obj, tuple):
-        obj = _serialize_object(obj, serialize_private_attributes)
+    # Pre-process tuples recursively
+    obj = _preprocess_tuples(obj, serialize_private_attributes)
     
     # Use custom encoder that handles nested enums
     json_str = json.dumps(obj, cls=EnumEncoder, default=lambda o: _serialize_object(o, serialize_private_attributes))
     return json_str if string_output else json.loads(json_str)
+
+
+def _preprocess_tuples(obj, serialize_private_attributes=False):
+    """Recursively convert tuples to serializable dict format."""
+    if isinstance(obj, tuple):
+        return _serialize_object(obj, serialize_private_attributes)
+    elif isinstance(obj, list):
+        return [_preprocess_tuples(item, serialize_private_attributes) for item in obj]
+    elif isinstance(obj, dict):
+        return {k: _preprocess_tuples(v, serialize_private_attributes) for k, v in obj.items()}
+    elif isinstance(obj, Enum):
+        return _serialize_object(obj, serialize_private_attributes)
+    return obj
 
 
 def deserialize(obj, deserialize_private_attributes: bool = False, string_input: bool = False, expected_type: type = None):
@@ -147,6 +157,9 @@ def deserialize(obj, deserialize_private_attributes: bool = False, string_input:
     if type(obj) == list:
         return _deserialize_list(obj, expected_type=expected_type, deserialize_private_attributes=deserialize_private_attributes)
     elif type(obj) == dict:
+        # Check for tuple marker first
+        if obj.get('_is_tuple') and 'tuple' in _JsonicDeserializer.deserializers:
+            return _JsonicDeserializer.deserializers['tuple'](obj)
         if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj and obj[SERIALIZED_TYPE_ATTRIBUTE_NAME] in _JsonicDeserializer.deserializers:
             # There is custom deserializer for given objects serialized type, so use it
             return _deserialize_with_custom_deserializer(obj, expected_type=expected_type)
@@ -215,6 +228,8 @@ def _serialize_object(obj, serialize_private_attributes=False):
         for key, value in obj.__dict__.items():
             if isinstance(value, Enum):
                 result[key] = _serialize_object(value, serialize_private_attributes)
+            elif isinstance(value, tuple):
+                result[key] = _serialize_object(value, serialize_private_attributes)
             else:
                 result[key] = value
         for key, val in ignored_attributes.items():
@@ -277,7 +292,9 @@ def _deserialize_generic_dict(obj: dict, deserialize_private_attributes: bool = 
     deserialized_dict = {}
 
     for key, value in obj.items():
-        if (type(value) == dict and SERIALIZED_TYPE_ATTRIBUTE_NAME in value) or type(value) == list:
+        if type(value) == dict and (SERIALIZED_TYPE_ATTRIBUTE_NAME in value or value.get('_is_tuple')):
+            deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
+        elif type(value) == list:
             deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
         elif type(value) == dict:  # value is is a dict but not jsonic type dict
             deserialized_dict[key] = _deserialize_generic_dict(value, deserialize_private_attributes=deserialize_private_attributes)
@@ -362,7 +379,7 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
         elif type(value) == list:
             deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
         elif type(value) == dict:
-            if SERIALIZED_TYPE_ATTRIBUTE_NAME in value:
+            if SERIALIZED_TYPE_ATTRIBUTE_NAME in value or value.get('_is_tuple'):
                 deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
             else:
                 deserialized_dict[key] = _deserialize_generic_dict(value, deserialize_private_attributes=deserialize_private_attributes)
