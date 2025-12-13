@@ -331,14 +331,12 @@ def _serialize_object(obj, serialize_private_attributes=False, path=""):
     from jsonic.type_resolver import get_resolver_for_type
     resolver = get_resolver_for_type(typ)
     if resolver:
-        try:
-            result = resolver.serialize(obj, serialize_private_attributes)
-            result[SERIALIZED_TYPE_ATTRIBUTE_NAME] = type_name
-            return result
-        except (TypeError, SerializationError) as e:
-            if isinstance(e, SerializationError):
-                raise
-            raise SerializationError(str(e), path)
+        result = _handle_serialization_error(
+            lambda: resolver.serialize(obj, serialize_private_attributes),
+            path
+        )
+        result[SERIALIZED_TYPE_ATTRIBUTE_NAME] = type_name
+        return result
     
     # Fallback: Generic object with __dict__ or __slots__
     if hasattr(obj, '__dict__'):
