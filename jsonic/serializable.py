@@ -115,14 +115,10 @@ def serialize(obj, serialize_private_attributes=False, string_output=False):
         Only class instances of classes extending ``Serializable`` or registered using ``register_jsonic_type`` can be serialized
     """
     # Pre-process everything recursively - this handles tuples, sets, and all objects
-    try:
-        obj = _preprocess_for_serialization(obj, serialize_private_attributes)
-    except (SerializationError, ValueError):
-        raise
-    except RecursionError:
-        raise ValueError("Circular reference detected during serialization")
-    except (TypeError, Exception) as e:
-        raise SerializationError(str(e), "")
+    obj = _handle_serialization_error(
+        lambda: _preprocess_for_serialization(obj, serialize_private_attributes),
+        ""
+    )
     
     # Use custom encoder that handles nested enums
     json_str = json.dumps(obj, cls=EnumEncoder)
