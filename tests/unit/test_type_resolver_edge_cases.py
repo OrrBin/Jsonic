@@ -287,7 +287,8 @@ class TestMalformedData:
         class Expected:
             value: int
         
-        malformed = {"value": "not_an_int", "_serialized_type": "__main__.Expected"}
+        from jsonic.util import full_type_name
+        malformed = {"value": "not_an_int", "_serialized_type": full_type_name(Expected)}
         
         # Should deserialize but value will be string (type coercion is not enforced)
         result = deserialize(malformed, expected_type=Expected)

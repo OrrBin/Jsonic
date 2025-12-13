@@ -1,6 +1,7 @@
 """Resolver for Python dataclasses."""
 
 import dataclasses
+from enum import Enum
 from typing import Any, Dict, Type
 from jsonic.type_resolver import TypeResolver
 
@@ -10,21 +11,38 @@ class DataclassResolver(TypeResolver):
     
     def can_resolve(self, cls: Type) -> bool:
         """Check if type is a dataclass."""
-        return dataclasses.is_dataclass(cls) and not isinstance(cls, type(type))
+        return dataclasses.is_dataclass(cls)
     
     def serialize(self, obj: Any) -> Dict[str, Any]:
-        """Serialize a dataclass instance."""
-        return dataclasses.asdict(obj)
+        """Serialize a dataclass instance, handling enums specially."""
+        from jsonic.serializable import _serialize_object
+        result = {}
+        for field in dataclasses.fields(obj):
+            value = getattr(obj, field.name)
+            # Recursively serialize enums
+            if isinstance(value, Enum):
+                result[field.name] = _serialize_object(value)
+            else:
+                result[field.name] = value
+        return result
     
     def deserialize(self, data: Dict[str, Any], cls: Type) -> Any:
         """Deserialize data into a dataclass instance."""
         # Get field names and types
         fields = {f.name: f for f in dataclasses.fields(cls)}
         
-        # Filter data to only include fields that exist in the dataclass
-        init_data = {k: v for k, v in data.items() if k in fields}
+        # Filter data to only include fields that are in __init__ (init=True)
+        init_data = {k: v for k, v in data.items() if k in fields and fields[k].init}
         
-        return cls(**init_data)
+        # Create instance
+        instance = cls(**init_data)
+        
+        # Set fields with init=False after creation
+        for k, v in data.items():
+            if k in fields and not fields[k].init:
+                setattr(instance, k, v)
+        
+        return instance
     
     def priority(self) -> int:
         """Dataclass resolver priority."""

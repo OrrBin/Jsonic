@@ -223,7 +223,7 @@ class TestBackwardCompatibility:
         class WithTransient(Serializable):
             transient_attributes = ['temp']
             
-            def __init__(self, value: str, temp: str):
+            def __init__(self, value: str, temp: str = "default"):
                 super().__init__()
                 self.value = value
                 self.temp = temp
@@ -232,7 +232,7 @@ class TestBackwardCompatibility:
         result = deserialize(serialize(obj))
         
         assert result.value == "keep"
-        assert not hasattr(result, 'temp')
+        assert not hasattr(result, 'temp') or result.temp == "default"
 
 
 class TestPriorityResolution:

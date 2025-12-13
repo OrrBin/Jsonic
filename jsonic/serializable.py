@@ -370,6 +370,7 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
     sign = inspect.signature(cls.__init__)
 
     init_parameters_mapping = Serializable.jsonic_types[type_name].init_parameters_mapping if is_jsonic_type else {}
+    transient_attrs = Serializable.jsonic_types[type_name].transient_attributes if is_jsonic_type else []
 
     for parameter_name, parameter_data in sign.parameters.items():
         if not deserialize_private_attributes and is_private_attribute(parameter_name):
@@ -382,6 +383,10 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
         elif parameter_name in init_parameters_mapping:
             init_dict[parameter_name] = deserialized_dict[init_parameters_mapping[parameter_name]]
         else:  # assuming parameter has same name as corresponding attribute
+            # Skip transient attributes only if they have a default value
+            if transient_attrs and parameter_name in transient_attrs:
+                if parameter_data.default != inspect.Parameter.empty:
+                    continue
             if parameter_name not in deserialized_dict:
                 raise AttributeError(f'Missing attribute in given dict to match __init__ parameter: {parameter_name}.\n'
                                      f'If relevant, consider registering type "{type_name}" using "register_jsonic_type" '
