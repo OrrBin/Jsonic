@@ -171,11 +171,6 @@ def _preprocess_for_serialization(obj, serialize_private_attributes=False, path=
     return _serialize_object(obj, serialize_private_attributes, path)
 
 
-def _preprocess_tuples(obj, serialize_private_attributes=False, path=""):
-    """Legacy function - redirects to _preprocess_for_serialization."""
-    return _preprocess_for_serialization(obj, serialize_private_attributes, path)
-
-
 def deserialize(obj, deserialize_private_attributes: bool = False, string_input: bool = False, expected_type: type = None, _path: str = ""):
     """
     Deserializes dictionary/json string representing dictionary, that was returned by ``serialize`` function call on an object
