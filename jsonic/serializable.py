@@ -122,8 +122,8 @@ def serialize(obj, serialize_private_attributes=False, string_output=False):
 
 
 def _preprocess_tuples(obj, serialize_private_attributes=False):
-    """Recursively convert tuples to serializable dict format."""
-    if isinstance(obj, tuple):
+    """Recursively convert tuples and sets to serializable dict format."""
+    if isinstance(obj, (tuple, set)):
         return _serialize_object(obj, serialize_private_attributes)
     elif isinstance(obj, list):
         return [_preprocess_tuples(item, serialize_private_attributes) for item in obj]
@@ -157,9 +157,11 @@ def deserialize(obj, deserialize_private_attributes: bool = False, string_input:
     if type(obj) == list:
         return _deserialize_list(obj, expected_type=expected_type, deserialize_private_attributes=deserialize_private_attributes)
     elif type(obj) == dict:
-        # Check for tuple marker first
+        # Check for tuple/set markers first
         if obj.get('_is_tuple') and 'tuple' in _JsonicDeserializer.deserializers:
             return _JsonicDeserializer.deserializers['tuple'](obj)
+        if obj.get('_is_set') and 'set' in _JsonicDeserializer.deserializers:
+            return _JsonicDeserializer.deserializers['set'](obj)
         if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj and obj[SERIALIZED_TYPE_ATTRIBUTE_NAME] in _JsonicDeserializer.deserializers:
             # There is custom deserializer for given objects serialized type, so use it
             return _deserialize_with_custom_deserializer(obj, expected_type=expected_type)
@@ -228,7 +230,7 @@ def _serialize_object(obj, serialize_private_attributes=False):
         for key, value in obj.__dict__.items():
             if isinstance(value, Enum):
                 result[key] = _serialize_object(value, serialize_private_attributes)
-            elif isinstance(value, tuple):
+            elif isinstance(value, (tuple, set)):
                 result[key] = _serialize_object(value, serialize_private_attributes)
             else:
                 result[key] = value
@@ -252,7 +254,7 @@ def _serialize_object(obj, serialize_private_attributes=False):
         for key, value in obj.__dict__.items():
             if isinstance(value, Enum):
                 result[key] = _serialize_object(value, serialize_private_attributes)
-            elif isinstance(value, tuple):
+            elif isinstance(value, (tuple, set)):
                 result[key] = _serialize_object(value, serialize_private_attributes)
             else:
                 result[key] = value
@@ -292,7 +294,7 @@ def _deserialize_generic_dict(obj: dict, deserialize_private_attributes: bool = 
     deserialized_dict = {}
 
     for key, value in obj.items():
-        if type(value) == dict and (SERIALIZED_TYPE_ATTRIBUTE_NAME in value or value.get('_is_tuple')):
+        if type(value) == dict and (SERIALIZED_TYPE_ATTRIBUTE_NAME in value or value.get('_is_tuple') or value.get('_is_set')):
             deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
         elif type(value) == list:
             deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
@@ -379,7 +381,7 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
         elif type(value) == list:
             deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
         elif type(value) == dict:
-            if SERIALIZED_TYPE_ATTRIBUTE_NAME in value or value.get('_is_tuple'):
+            if SERIALIZED_TYPE_ATTRIBUTE_NAME in value or value.get('_is_tuple') or value.get('_is_set'):
                 deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
             else:
                 deserialized_dict[key] = _deserialize_generic_dict(value, deserialize_private_attributes=deserialize_private_attributes)

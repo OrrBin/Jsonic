@@ -9,5 +9,6 @@ from .resolvers import DataclassResolver, TypeHintedResolver
 register_resolver(DataclassResolver())
 register_resolver(TypeHintedResolver())
 
-# Register tuple serializer
+# Register tuple and set serializers
 from . import tuple_serializer
+from . import set_serializer
