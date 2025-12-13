@@ -21,15 +21,33 @@ class TypeHintedResolver(TypeResolver):
             return False
     
     def serialize(self, obj: Any) -> Dict[str, Any]:
-        """Serialize object by extracting __dict__, handling tuples."""
-        from jsonic.serializable import _serialize_object
+        """Serialize object by extracting __dict__ or __slots__, handling tuples and sets."""
+        from jsonic.serializable import _serialize_object, _get_all_slots, _preprocess_tuples
         result = {}
-        for key, value in obj.__dict__.items():
-            # Recursively serialize tuples and enums
-            if isinstance(value, tuple):
-                result[key] = _serialize_object(value)
-            else:
-                result[key] = value
+        
+        # Handle both __dict__ and __slots__
+        if hasattr(obj, '__dict__') and len(obj.__dict__) > 0:
+            for key, value in obj.__dict__.items():
+                if isinstance(value, (tuple, set)):
+                    result[key] = _serialize_object(value)
+                elif isinstance(value, (list, dict)):
+                    # Recursively preprocess lists and dicts for nested tuples/sets
+                    result[key] = _preprocess_tuples(value)
+                else:
+                    result[key] = value
+        elif hasattr(obj, '__slots__'):
+            slots = _get_all_slots(type(obj))
+            for slot in slots:
+                if hasattr(obj, slot):
+                    value = getattr(obj, slot)
+                    if isinstance(value, (tuple, set)):
+                        result[slot] = _serialize_object(value)
+                    elif isinstance(value, (list, dict)):
+                        # Recursively preprocess lists and dicts for nested tuples/sets
+                        result[slot] = _preprocess_tuples(value)
+                    else:
+                        result[slot] = value
+        
         return result
     
     def deserialize(self, data: Dict[str, Any], cls: Type) -> Any:
