@@ -182,15 +182,18 @@ def _serialize_object(obj, serialize_private_attributes=False):
             SERIALIZED_TYPE_ATTRIBUTE_NAME: full_type_name(typ)
         }
     
+    # Priority 1: Custom serializers (100)
     if typ in _JsonicSerializer.serializers:
         value = _JsonicSerializer.serializers[typ](obj)
         value[SERIALIZED_TYPE_ATTRIBUTE_NAME] = typ.__name__
         return value
 
-    elif hasattr(obj, '__dict__'):
-        type_name = full_type_name(typ)
-        is_jsonic_type = type_name in Serializable.jsonic_types
-        type_data = Serializable.jsonic_types[type_name] if is_jsonic_type else None
+    # Priority 2: Serializable types (100)
+    type_name = full_type_name(typ)
+    is_jsonic_type = type_name in Serializable.jsonic_types
+    
+    if is_jsonic_type and hasattr(obj, '__dict__'):
+        type_data = Serializable.jsonic_types[type_name]
         ignored_attributes = {}
 
         if not serialize_private_attributes:  # Do not serialize private attributes
@@ -199,7 +202,7 @@ def _serialize_object(obj, serialize_private_attributes=False):
                 ignored_attributes[key] = getattr(obj, key)
                 delattr(obj, key)
 
-        if type_data and type_data.transient_attributes:  # Do not serialize transient attributes
+        if type_data.transient_attributes:  # Do not serialize transient attributes
             to_remove = [key for key in obj.__dict__.keys() if key in type_data.transient_attributes]
             for key in to_remove:
                 ignored_attributes[key] = getattr(obj, key)
@@ -215,6 +218,25 @@ def _serialize_object(obj, serialize_private_attributes=False):
         for key, val in ignored_attributes.items():
             setattr(obj, key, val)
 
+        return result
+    
+    # Priority 3: Type resolvers (dataclass=50, typehinted=25)
+    from jsonic.type_resolver import get_resolver_for_type
+    resolver = get_resolver_for_type(typ)
+    if resolver:
+        result = resolver.serialize(obj)
+        result[SERIALIZED_TYPE_ATTRIBUTE_NAME] = type_name
+        return result
+    
+    # Fallback: Generic object with __dict__
+    if hasattr(obj, '__dict__'):
+        setattr(obj, SERIALIZED_TYPE_ATTRIBUTE_NAME, type_name)
+        result = {}
+        for key, value in obj.__dict__.items():
+            if isinstance(value, Enum):
+                result[key] = _serialize_object(value, serialize_private_attributes)
+            else:
+                result[key] = value
         return result
 
     raise TypeError(f'Could not find serializer for type: {typ}')
@@ -265,11 +287,23 @@ def get_type_by_name(type_name: str):
     if type_name in Serializable.jsonic_types:
         return Serializable.jsonic_types[type_name].cls
 
-    last_index = type_name.rindex('.')
-    module_name = type_name[0:last_index]
-    cls_name = type_name[last_index + 1:]
-    module = importlib.import_module(module_name)
-    return getattr(module, cls_name)
+    try:
+        last_index = type_name.rindex('.')
+        module_name = type_name[0:last_index]
+        cls_name = type_name[last_index + 1:]
+        module = importlib.import_module(module_name)
+        return getattr(module, cls_name)
+    except (AttributeError, ValueError):
+        # Class might be defined locally (e.g., in a test function)
+        # Try to find it in the type resolver's internal cache
+        import sys
+        for frame_info in inspect.stack():
+            frame_locals = frame_info.frame.f_locals
+            if cls_name in frame_locals:
+                cls = frame_locals[cls_name]
+                if inspect.isclass(cls) and full_type_name(cls) == type_name:
+                    return cls
+        raise TypeError(f'Could not find type: {type_name}')
 
 
 def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=False, expected_type: type = None):
@@ -291,6 +325,28 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
             return cls[obj['name']]
         else:
             return cls(obj['value'])
+    
+    # Try type resolver (but not for Serializable types - they have priority)
+    if not is_jsonic_type:
+        from jsonic.type_resolver import get_resolver_for_type
+        resolver = get_resolver_for_type(cls)
+        if resolver:
+            # Recursively deserialize nested structures first
+            data = {}
+            for key, value in obj.items():
+                if key == SERIALIZED_TYPE_ATTRIBUTE_NAME:
+                    continue
+                elif type(value) == list:
+                    data[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
+                elif type(value) == dict:
+                    if SERIALIZED_TYPE_ATTRIBUTE_NAME in value:
+                        data[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
+                    else:
+                        data[key] = _deserialize_generic_dict(value, deserialize_private_attributes=deserialize_private_attributes)
+                else:
+                    data[key] = value
+            
+            return resolver.deserialize(data, cls)
 
     deserialized_dict = {}
 
