@@ -269,7 +269,7 @@ def _serialize_object(obj, serialize_private_attributes=False):
     from jsonic.type_resolver import get_resolver_for_type
     resolver = get_resolver_for_type(typ)
     if resolver:
-        result = resolver.serialize(obj)
+        result = resolver.serialize(obj, serialize_private_attributes)
         result[SERIALIZED_TYPE_ATTRIBUTE_NAME] = type_name
         return result
     
@@ -278,6 +278,9 @@ def _serialize_object(obj, serialize_private_attributes=False):
         setattr(obj, SERIALIZED_TYPE_ATTRIBUTE_NAME, type_name)
         result = {}
         for key, value in obj.__dict__.items():
+            # Skip private attributes if requested (but not _serialized_type)
+            if not serialize_private_attributes and key.startswith('_') and key != SERIALIZED_TYPE_ATTRIBUTE_NAME:
+                continue
             if isinstance(value, Enum):
                 result[key] = _serialize_object(value, serialize_private_attributes)
             elif isinstance(value, (tuple, set)):
@@ -291,6 +294,9 @@ def _serialize_object(obj, serialize_private_attributes=False):
         slots = _get_all_slots(typ)
         for slot in slots:
             if hasattr(obj, slot):
+                # Skip private attributes if requested
+                if not serialize_private_attributes and slot.startswith('_'):
+                    continue
                 value = getattr(obj, slot)
                 if isinstance(value, Enum):
                     result[slot] = _serialize_object(value, serialize_private_attributes)
@@ -364,6 +370,7 @@ def get_type_by_name(type_name: str):
     if type_name in Serializable.jsonic_types:
         return Serializable.jsonic_types[type_name].cls
 
+    cls_name = None
     try:
         last_index = type_name.rindex('.')
         module_name = type_name[0:last_index]
@@ -373,13 +380,14 @@ def get_type_by_name(type_name: str):
     except (AttributeError, ValueError):
         # Class might be defined locally (e.g., in a test function)
         # Try to find it in the type resolver's internal cache
-        import sys
-        for frame_info in inspect.stack():
-            frame_locals = frame_info.frame.f_locals
-            if cls_name in frame_locals:
-                cls = frame_locals[cls_name]
-                if inspect.isclass(cls) and full_type_name(cls) == type_name:
-                    return cls
+        if cls_name:
+            import sys
+            for frame_info in inspect.stack():
+                frame_locals = frame_info.frame.f_locals
+                if cls_name in frame_locals:
+                    cls = frame_locals[cls_name]
+                    if inspect.isclass(cls) and full_type_name(cls) == type_name:
+                        return cls
         raise TypeError(f'Could not find type: {type_name}')
 
 
