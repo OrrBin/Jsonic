@@ -102,8 +102,9 @@ class TestComplexTypeHints:
         point = Point((10.5, 20.3))
         result = deserialize(serialize(point), expected_type=Point)
         
-        # Note: JSON doesn't support tuples, so they become lists
-        assert result.coords == [10.5, 20.3] or result.coords == (10.5, 20.3)
+        # Tuples are now properly preserved!
+        assert result.coords == (10.5, 20.3)
+        assert isinstance(result.coords, tuple)
     
     def test_optional_list_type_hint(self):
         """Class with Optional[List[T]] type hint."""

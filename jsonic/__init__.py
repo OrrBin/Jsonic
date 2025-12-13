@@ -8,3 +8,6 @@ from .resolvers import DataclassResolver, TypeHintedResolver
 
 register_resolver(DataclassResolver())
 register_resolver(TypeHintedResolver())
+
+# Register tuple serializer
+from . import tuple_serializer

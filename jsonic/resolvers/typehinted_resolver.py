@@ -21,8 +21,16 @@ class TypeHintedResolver(TypeResolver):
             return False
     
     def serialize(self, obj: Any) -> Dict[str, Any]:
-        """Serialize object by extracting __dict__."""
-        return dict(obj.__dict__)
+        """Serialize object by extracting __dict__, handling tuples."""
+        from jsonic.serializable import _serialize_object
+        result = {}
+        for key, value in obj.__dict__.items():
+            # Recursively serialize tuples and enums
+            if isinstance(value, tuple):
+                result[key] = _serialize_object(value)
+            else:
+                result[key] = value
+        return result
     
     def deserialize(self, data: Dict[str, Any], cls: Type) -> Any:
         """Deserialize data using type hints from __init__."""

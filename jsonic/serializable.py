@@ -113,8 +113,10 @@ def serialize(obj, serialize_private_attributes=False, string_output=False):
     Note:
         Only class instances of classes extending ``Serializable`` or registered using ``register_jsonic_type`` can be serialized
     """
-    # Pre-process enums before json.dumps (IntEnum would be treated as int otherwise)
+    # Pre-process enums and tuples before json.dumps
     if isinstance(obj, Enum):
+        obj = _serialize_object(obj, serialize_private_attributes)
+    elif isinstance(obj, tuple):
         obj = _serialize_object(obj, serialize_private_attributes)
     
     # Use custom encoder that handles nested enums
@@ -234,6 +236,8 @@ def _serialize_object(obj, serialize_private_attributes=False):
         result = {}
         for key, value in obj.__dict__.items():
             if isinstance(value, Enum):
+                result[key] = _serialize_object(value, serialize_private_attributes)
+            elif isinstance(value, tuple):
                 result[key] = _serialize_object(value, serialize_private_attributes)
             else:
                 result[key] = value
