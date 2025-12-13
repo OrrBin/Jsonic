@@ -113,13 +113,25 @@ def serialize(obj, serialize_private_attributes=False, string_output=False):
     Note:
         Only class instances of classes extending ``Serializable`` or registered using ``register_jsonic_type`` can be serialized
     """
-    # Pre-process enums before json.dumps (IntEnum would be treated as int otherwise)
-    if isinstance(obj, Enum):
-        obj = _serialize_object(obj, serialize_private_attributes)
+    # Pre-process tuples recursively
+    obj = _preprocess_tuples(obj, serialize_private_attributes)
     
     # Use custom encoder that handles nested enums
     json_str = json.dumps(obj, cls=EnumEncoder, default=lambda o: _serialize_object(o, serialize_private_attributes))
     return json_str if string_output else json.loads(json_str)
+
+
+def _preprocess_tuples(obj, serialize_private_attributes=False):
+    """Recursively convert tuples and sets to serializable dict format."""
+    if isinstance(obj, (tuple, set)):
+        return _serialize_object(obj, serialize_private_attributes)
+    elif isinstance(obj, list):
+        return [_preprocess_tuples(item, serialize_private_attributes) for item in obj]
+    elif isinstance(obj, dict):
+        return {k: _preprocess_tuples(v, serialize_private_attributes) for k, v in obj.items()}
+    elif isinstance(obj, Enum):
+        return _serialize_object(obj, serialize_private_attributes)
+    return obj
 
 
 def deserialize(obj, deserialize_private_attributes: bool = False, string_input: bool = False, expected_type: type = None):
@@ -145,6 +157,11 @@ def deserialize(obj, deserialize_private_attributes: bool = False, string_input:
     if type(obj) == list:
         return _deserialize_list(obj, expected_type=expected_type, deserialize_private_attributes=deserialize_private_attributes)
     elif type(obj) == dict:
+        # Check for tuple/set markers first
+        if obj.get('_is_tuple') and 'tuple' in _JsonicDeserializer.deserializers:
+            return _JsonicDeserializer.deserializers['tuple'](obj)
+        if obj.get('_is_set') and 'set' in _JsonicDeserializer.deserializers:
+            return _JsonicDeserializer.deserializers['set'](obj)
         if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj and obj[SERIALIZED_TYPE_ATTRIBUTE_NAME] in _JsonicDeserializer.deserializers:
             # There is custom deserializer for given objects serialized type, so use it
             return _deserialize_with_custom_deserializer(obj, expected_type=expected_type)
@@ -182,42 +199,128 @@ def _serialize_object(obj, serialize_private_attributes=False):
             SERIALIZED_TYPE_ATTRIBUTE_NAME: full_type_name(typ)
         }
     
+    # Priority 1: Custom serializers (100)
     if typ in _JsonicSerializer.serializers:
         value = _JsonicSerializer.serializers[typ](obj)
         value[SERIALIZED_TYPE_ATTRIBUTE_NAME] = typ.__name__
         return value
 
-    elif hasattr(obj, '__dict__'):
-        type_name = full_type_name(typ)
-        is_jsonic_type = type_name in Serializable.jsonic_types
-        type_data = Serializable.jsonic_types[type_name] if is_jsonic_type else None
+    # Priority 2: Serializable types (100)
+    type_name = full_type_name(typ)
+    is_jsonic_type = type_name in Serializable.jsonic_types
+    
+    if is_jsonic_type:
+        type_data = Serializable.jsonic_types[type_name]
         ignored_attributes = {}
+        
+        # Handle both __dict__ and __slots__
+        # If __dict__ exists but is empty and __slots__ exists, use __slots__
+        has_dict = hasattr(obj, '__dict__') and len(obj.__dict__) > 0
+        has_slots = hasattr(obj, '__slots__')
+        
+        if has_dict:
+            if not serialize_private_attributes:  # Do not serialize private attributes
+                to_remove = [key for key in obj.__dict__.keys() if key.startswith('_')]
+                for key in to_remove:
+                    ignored_attributes[key] = getattr(obj, key)
+                    delattr(obj, key)
 
-        if not serialize_private_attributes:  # Do not serialize private attributes
-            to_remove = [key for key in obj.__dict__.keys() if key.startswith('_')]
-            for key in to_remove:
-                ignored_attributes[key] = getattr(obj, key)
-                delattr(obj, key)
+            if type_data.transient_attributes:  # Do not serialize transient attributes
+                to_remove = [key for key in obj.__dict__.keys() if key in type_data.transient_attributes]
+                for key in to_remove:
+                    ignored_attributes[key] = getattr(obj, key)
+                    delattr(obj, key)
 
-        if type_data and type_data.transient_attributes:  # Do not serialize transient attributes
-            to_remove = [key for key in obj.__dict__.keys() if key in type_data.transient_attributes]
-            for key in to_remove:
-                ignored_attributes[key] = getattr(obj, key)
-                delattr(obj, key)
+            setattr(obj, SERIALIZED_TYPE_ATTRIBUTE_NAME, type_name)
+            result = {}
+            for key, value in obj.__dict__.items():
+                if isinstance(value, Enum):
+                    result[key] = _serialize_object(value, serialize_private_attributes)
+                elif isinstance(value, (tuple, set)):
+                    result[key] = _serialize_object(value, serialize_private_attributes)
+                else:
+                    result[key] = value
+            for key, val in ignored_attributes.items():
+                setattr(obj, key, val)
 
+            return result
+        elif has_slots:
+            # Handle __slots__ for Serializable
+            result = {SERIALIZED_TYPE_ATTRIBUTE_NAME: type_name}
+            slots = _get_all_slots(typ)
+            for slot in slots:
+                if hasattr(obj, slot):
+                    # Skip private and transient attributes
+                    if not serialize_private_attributes and slot.startswith('_'):
+                        continue
+                    if type_data.transient_attributes and slot in type_data.transient_attributes:
+                        continue
+                    
+                    value = getattr(obj, slot)
+                    if isinstance(value, Enum):
+                        result[slot] = _serialize_object(value, serialize_private_attributes)
+                    elif isinstance(value, (tuple, set)):
+                        result[slot] = _serialize_object(value, serialize_private_attributes)
+                    else:
+                        result[slot] = value
+            return result
+    
+    # Priority 3: Type resolvers (dataclass=50, typehinted=25)
+    from jsonic.type_resolver import get_resolver_for_type
+    resolver = get_resolver_for_type(typ)
+    if resolver:
+        result = resolver.serialize(obj, serialize_private_attributes)
+        result[SERIALIZED_TYPE_ATTRIBUTE_NAME] = type_name
+        return result
+    
+    # Fallback: Generic object with __dict__ or __slots__
+    if hasattr(obj, '__dict__'):
         setattr(obj, SERIALIZED_TYPE_ATTRIBUTE_NAME, type_name)
         result = {}
         for key, value in obj.__dict__.items():
+            # Skip private attributes if requested (but not _serialized_type)
+            if not serialize_private_attributes and key.startswith('_') and key != SERIALIZED_TYPE_ATTRIBUTE_NAME:
+                continue
             if isinstance(value, Enum):
+                result[key] = _serialize_object(value, serialize_private_attributes)
+            elif isinstance(value, (tuple, set)):
                 result[key] = _serialize_object(value, serialize_private_attributes)
             else:
                 result[key] = value
-        for key, val in ignored_attributes.items():
-            setattr(obj, key, val)
-
+        return result
+    elif hasattr(obj, '__slots__'):
+        # Handle __slots__ classes
+        result = {SERIALIZED_TYPE_ATTRIBUTE_NAME: type_name}
+        slots = _get_all_slots(typ)
+        for slot in slots:
+            if hasattr(obj, slot):
+                # Skip private attributes if requested
+                if not serialize_private_attributes and slot.startswith('_'):
+                    continue
+                value = getattr(obj, slot)
+                if isinstance(value, Enum):
+                    result[slot] = _serialize_object(value, serialize_private_attributes)
+                elif isinstance(value, (tuple, set)):
+                    result[slot] = _serialize_object(value, serialize_private_attributes)
+                else:
+                    result[slot] = value
         return result
 
     raise TypeError(f'Could not find serializer for type: {typ}')
+
+
+def _get_all_slots(cls):
+    """Get all __slots__ from a class and its bases."""
+    slots = []
+    for c in cls.__mro__:
+        if hasattr(c, '__slots__'):
+            c_slots = c.__slots__
+            # __slots__ can be a string, list, or tuple
+            if isinstance(c_slots, str):
+                slots.append(c_slots)
+            else:
+                slots.extend(c_slots)
+    return slots
 
 
 def _deserialize_with_custom_deserializer(obj, expected_type: type = None):
@@ -251,7 +354,9 @@ def _deserialize_generic_dict(obj: dict, deserialize_private_attributes: bool = 
     deserialized_dict = {}
 
     for key, value in obj.items():
-        if (type(value) == dict and SERIALIZED_TYPE_ATTRIBUTE_NAME in value) or type(value) == list:
+        if type(value) == dict and (SERIALIZED_TYPE_ATTRIBUTE_NAME in value or value.get('_is_tuple') or value.get('_is_set')):
+            deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
+        elif type(value) == list:
             deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
         elif type(value) == dict:  # value is is a dict but not jsonic type dict
             deserialized_dict[key] = _deserialize_generic_dict(value, deserialize_private_attributes=deserialize_private_attributes)
@@ -265,11 +370,25 @@ def get_type_by_name(type_name: str):
     if type_name in Serializable.jsonic_types:
         return Serializable.jsonic_types[type_name].cls
 
-    last_index = type_name.rindex('.')
-    module_name = type_name[0:last_index]
-    cls_name = type_name[last_index + 1:]
-    module = importlib.import_module(module_name)
-    return getattr(module, cls_name)
+    cls_name = None
+    try:
+        last_index = type_name.rindex('.')
+        module_name = type_name[0:last_index]
+        cls_name = type_name[last_index + 1:]
+        module = importlib.import_module(module_name)
+        return getattr(module, cls_name)
+    except (AttributeError, ValueError):
+        # Class might be defined locally (e.g., in a test function)
+        # Try to find it in the type resolver's internal cache
+        if cls_name:
+            import sys
+            for frame_info in inspect.stack():
+                frame_locals = frame_info.frame.f_locals
+                if cls_name in frame_locals:
+                    cls = frame_locals[cls_name]
+                    if inspect.isclass(cls) and full_type_name(cls) == type_name:
+                        return cls
+        raise TypeError(f'Could not find type: {type_name}')
 
 
 def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=False, expected_type: type = None):
@@ -291,6 +410,28 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
             return cls[obj['name']]
         else:
             return cls(obj['value'])
+    
+    # Try type resolver (but not for Serializable types - they have priority)
+    if not is_jsonic_type:
+        from jsonic.type_resolver import get_resolver_for_type
+        resolver = get_resolver_for_type(cls)
+        if resolver:
+            # Recursively deserialize nested structures first
+            data = {}
+            for key, value in obj.items():
+                if key == SERIALIZED_TYPE_ATTRIBUTE_NAME:
+                    continue
+                elif type(value) == list:
+                    data[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
+                elif type(value) == dict:
+                    if SERIALIZED_TYPE_ATTRIBUTE_NAME in value:
+                        data[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
+                    else:
+                        data[key] = _deserialize_generic_dict(value, deserialize_private_attributes=deserialize_private_attributes)
+                else:
+                    data[key] = value
+            
+            return resolver.deserialize(data, cls)
 
     deserialized_dict = {}
 
@@ -302,7 +443,7 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
         elif type(value) == list:
             deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
         elif type(value) == dict:
-            if SERIALIZED_TYPE_ATTRIBUTE_NAME in value:
+            if SERIALIZED_TYPE_ATTRIBUTE_NAME in value or value.get('_is_tuple') or value.get('_is_set'):
                 deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
             else:
                 deserialized_dict[key] = _deserialize_generic_dict(value, deserialize_private_attributes=deserialize_private_attributes)
@@ -314,6 +455,7 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
     sign = inspect.signature(cls.__init__)
 
     init_parameters_mapping = Serializable.jsonic_types[type_name].init_parameters_mapping if is_jsonic_type else {}
+    transient_attrs = Serializable.jsonic_types[type_name].transient_attributes if is_jsonic_type else []
 
     for parameter_name, parameter_data in sign.parameters.items():
         if not deserialize_private_attributes and is_private_attribute(parameter_name):
@@ -326,6 +468,10 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
         elif parameter_name in init_parameters_mapping:
             init_dict[parameter_name] = deserialized_dict[init_parameters_mapping[parameter_name]]
         else:  # assuming parameter has same name as corresponding attribute
+            # Skip transient attributes only if they have a default value
+            if transient_attrs and parameter_name in transient_attrs:
+                if parameter_data.default != inspect.Parameter.empty:
+                    continue
             if parameter_name not in deserialized_dict:
                 raise AttributeError(f'Missing attribute in given dict to match __init__ parameter: {parameter_name}.\n'
                                      f'If relevant, consider registering type "{type_name}" using "register_jsonic_type" '
@@ -337,6 +483,9 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
     # After creating the instance, set all it's attributes to deserialized value
     for attr_name, attr_value in deserialized_dict.items():
         if not deserialize_private_attributes and is_private_attribute(attr_name):
+            continue
+        # Skip transient attributes
+        if transient_attrs and attr_name in transient_attrs:
             continue
         setattr(created_instance, attr_name, attr_value)
 
