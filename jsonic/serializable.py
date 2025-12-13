@@ -153,37 +153,21 @@ def _preprocess_for_serialization(obj, serialize_private_attributes=False, path=
     if obj is None or isinstance(obj, (bool, int, float, str)):
         return obj
     
-    # Handle tuples and sets
-    if isinstance(obj, (tuple, set)):
-        return _serialize_object(obj, serialize_private_attributes, path)
-    
     # Handle lists
     if isinstance(obj, list):
-        result = []
-        for i, item in enumerate(obj):
-            item_path = f"{path}[{i}]" if path else f"[{i}]"
-            result.append(_handle_serialization_error(
-                lambda: _preprocess_for_serialization(item, serialize_private_attributes, item_path),
-                item_path
-            ))
-        return result
+        return [_handle_serialization_error(
+            lambda item=item, i=i: _preprocess_for_serialization(item, serialize_private_attributes, f"{path}[{i}]" if path else f"[{i}]"),
+            f"{path}[{i}]" if path else f"[{i}]"
+        ) for i, item in enumerate(obj)]
     
     # Handle dicts
     if isinstance(obj, dict):
-        result = {}
-        for k, v in obj.items():
-            key_path = f"{path}.{k}" if path else k
-            result[k] = _handle_serialization_error(
-                lambda v=v, kp=key_path: _preprocess_for_serialization(v, serialize_private_attributes, kp),
-                key_path
-            )
-        return result
+        return {k: _handle_serialization_error(
+            lambda v=v, k=k: _preprocess_for_serialization(v, serialize_private_attributes, f"{path}.{k}" if path else k),
+            f"{path}.{k}" if path else k
+        ) for k, v in obj.items()}
     
-    # Handle enums
-    if isinstance(obj, Enum):
-        return _serialize_object(obj, serialize_private_attributes, path)
-    
-    # Handle all other objects
+    # Handle all other objects (tuples, sets, enums, custom objects)
     return _serialize_object(obj, serialize_private_attributes, path)
 
 
