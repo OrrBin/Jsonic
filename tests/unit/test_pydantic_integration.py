@@ -114,6 +114,62 @@ class TestPydanticValidation:
         data['price'] = -5.0
         with pytest.raises(Exception):  # Pydantic ValidationError
             deserialize(data, expected_type=Product)
+    
+    def test_missing_required_field_on_deserialization(self):
+        """Test that missing required fields are caught during deserialization."""
+        class User(BaseModel):
+            name: str
+            email: str
+        
+        # Create valid data
+        user = User(name="Alice", email="alice@example.com")
+        data = serialize(user)
+        
+        # Remove required field
+        del data['email']
+        
+        # Should raise ValidationError
+        with pytest.raises(Exception):  # Pydantic ValidationError
+            deserialize(data, expected_type=User)
+    
+    def test_wrong_type_on_deserialization(self):
+        """Test that wrong types are caught during deserialization."""
+        class Product(BaseModel):
+            name: str
+            price: float
+        
+        product = Product(name="Item", price=99.99)
+        data = serialize(product)
+        
+        # Change price to wrong type
+        data['price'] = "not a number"
+        
+        # Should raise ValidationError
+        with pytest.raises(Exception):  # Pydantic ValidationError
+            deserialize(data, expected_type=Product)
+    
+    def test_nested_validation_error(self):
+        """Test that validation errors in nested models are caught."""
+        class Address(BaseModel):
+            street: str
+            zip_code: str = Field(min_length=5, max_length=5)
+        
+        class User(BaseModel):
+            name: str
+            address: Address
+        
+        user = User(
+            name="Alice",
+            address=Address(street="123 Main St", zip_code="12345")
+        )
+        data = serialize(user)
+        
+        # Corrupt nested data
+        data['address']['zip_code'] = "1"  # Too short
+        
+        # Should raise ValidationError
+        with pytest.raises(Exception):  # Pydantic ValidationError
+            deserialize(data, expected_type=User)
 
 
 class TestNestedPydanticModels:
