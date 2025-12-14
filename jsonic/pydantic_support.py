@@ -92,7 +92,7 @@ def deserialize_pydantic_model(data: dict, cls: Type) -> Any:
     
     Uses Pydantic's model_validate() (V2) or parse_obj() (V1) method
     which includes validation. Recursively deserializes any Jsonic-serialized
-    nested structures (sets, tuples, custom objects) before passing to Pydantic.
+    nested structures (sets, tuples, custom objects, nested Pydantic models) before passing to Pydantic.
     
     Args:
         data: Dictionary to deserialize
@@ -107,35 +107,27 @@ def deserialize_pydantic_model(data: dict, cls: Type) -> Any:
     # Import here to avoid circular dependency
     from jsonic.serializable import deserialize, SERIALIZED_TYPE_ATTRIBUTE_NAME
     
+    def _deserialize_value(v):
+        """Recursively deserialize a value."""
+        if isinstance(v, dict):
+            # Check if it's a Jsonic-serialized structure
+            if v.get('_is_set') or v.get('_is_tuple') or SERIALIZED_TYPE_ATTRIBUTE_NAME in v:
+                return deserialize(v)
+            else:
+                # Regular dict, recursively process its values
+                return {k: _deserialize_value(nested_v) for k, nested_v in v.items()}
+        elif isinstance(v, list):
+            # Recursively deserialize list items
+            return [_deserialize_value(item) for item in v]
+        else:
+            return v
+    
     # Remove Jsonic metadata and recursively deserialize nested structures
     clean_data = {}
     for k, v in data.items():
         if k == '_serialized_type':
             continue
-        
-        # Recursively deserialize Jsonic structures
-        if isinstance(v, dict):
-            # Check if it's a Jsonic-serialized structure (set, tuple, or custom object)
-            if v.get('_is_set') or v.get('_is_tuple') or SERIALIZED_TYPE_ATTRIBUTE_NAME in v:
-                clean_data[k] = deserialize(v)
-            else:
-                # Regular dict, recursively process its values
-                clean_data[k] = {
-                    nested_k: deserialize(nested_v) if isinstance(nested_v, dict) and 
-                              (nested_v.get('_is_set') or nested_v.get('_is_tuple') or SERIALIZED_TYPE_ATTRIBUTE_NAME in nested_v)
-                              else nested_v
-                    for nested_k, nested_v in v.items()
-                }
-        elif isinstance(v, list):
-            # Recursively deserialize list items
-            clean_data[k] = [
-                deserialize(item) if isinstance(item, dict) and 
-                (item.get('_is_set') or item.get('_is_tuple') or SERIALIZED_TYPE_ATTRIBUTE_NAME in item)
-                else item
-                for item in v
-            ]
-        else:
-            clean_data[k] = v
+        clean_data[k] = _deserialize_value(v)
     
     # Use appropriate method based on Pydantic version
     if PYDANTIC_V2:
