@@ -476,3 +476,127 @@ class TestPydanticFieldAliases:
         assert "name" in data
         assert "description" in data
         assert "item_name" not in data
+    
+    def test_aliases_with_partial_serialization_exclude(self):
+        """Test that partial serialization works with aliased fields."""
+        from pydantic import Field
+        
+        class User(BaseModel):
+            user_id: int = Field(alias="userId")
+            email: str = Field(alias="email")
+            password: str = Field(alias="password")
+        
+        user = User(userId=1, email="test@example.com", password="secret")
+        # Exclude using alias name
+        data = serialize(user, exclude={'password'})
+        
+        assert "userId" in data
+        assert "email" in data
+        assert "password" not in data
+    
+    def test_aliases_with_partial_serialization_include(self):
+        """Test include parameter with aliased fields."""
+        from pydantic import Field
+        
+        class User(BaseModel):
+            user_id: int = Field(alias="userId")
+            email: str = Field(alias="email")
+            password: str = Field(alias="password")
+        
+        user = User(userId=1, email="test@example.com", password="secret")
+        # Include using alias names
+        data = serialize(user, include={'userId', 'email'})
+        
+        assert "userId" in data
+        assert "email" in data
+        assert "password" not in data
+    
+    def test_aliases_in_list(self):
+        """Test list of Pydantic models with aliases."""
+        from pydantic import Field
+        
+        class Product(BaseModel):
+            product_id: int = Field(alias="id")
+            product_name: str = Field(alias="name")
+        
+        products = [
+            Product(id=1, name="A"),
+            Product(id=2, name="B")
+        ]
+        data = serialize(products)
+        
+        assert len(data) == 2
+        assert data[0]["id"] == 1
+        assert data[0]["name"] == "A"
+        assert "product_id" not in data[0]
+    
+    def test_aliases_with_string_output(self):
+        """Test JSON string output with aliases."""
+        from pydantic import Field
+        import json
+        
+        class User(BaseModel):
+            user_id: int = Field(alias="userId")
+        
+        user = User(userId=123)
+        json_str = serialize(user, string_output=True)
+        parsed = json.loads(json_str)
+        
+        assert "userId" in parsed
+        assert "user_id" not in parsed
+    
+    def test_optional_field_with_alias(self):
+        """Test Optional fields with aliases."""
+        from pydantic import Field
+        from typing import Optional
+        
+        class User(BaseModel):
+            user_id: int = Field(alias="userId")
+            phone: Optional[str] = Field(alias="phoneNumber", default=None)
+        
+        user = User(userId=1)
+        data = serialize(user)
+        
+        assert "userId" in data
+        assert "phoneNumber" in data
+        assert data["phoneNumber"] is None
+    
+    def test_default_value_with_alias(self):
+        """Test default values with aliases."""
+        from pydantic import Field
+        
+        class Config(BaseModel):
+            app_name: str = Field(alias="appName")
+            debug_mode: bool = Field(alias="debug", default=False)
+        
+        config = Config(appName="MyApp")
+        data = serialize(config)
+        
+        assert data["appName"] == "MyApp"
+        assert data["debug"] is False
+        assert "debug_mode" not in data
+    
+    def test_nested_aliases_with_partial_serialization(self):
+        """Test nested model aliases with partial serialization."""
+        from pydantic import Field
+        
+        class Address(BaseModel):
+            street_name: str = Field(alias="street")
+            zip_code: str = Field(alias="zip")
+        
+        class User(BaseModel):
+            user_id: int = Field(alias="userId")
+            home_address: Address = Field(alias="address")
+        
+        user = User(
+            userId=1,
+            address=Address(street="Main St", zip="12345")
+        )
+        # Exclude nested aliased field
+        data = serialize(user, exclude={'address.zip'})
+        
+        assert "userId" in data
+        assert "address" in data
+        assert "street" in data["address"]
+        assert "zip" not in data["address"]
+
