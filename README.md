@@ -3,7 +3,7 @@
 [![PyPI version](https://badge.fury.io/py/py-jsonic.svg)](https://badge.fury.io/py/py-jsonic)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-436%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-441%20passing-brightgreen.svg)](tests/)
 
 **Jsonic** is a lightweight, Pythonic library for effortless JSON serialization and deserialization of Python objects. Built for modern Python with type hints, dataclasses, and developer experience in mind.
 

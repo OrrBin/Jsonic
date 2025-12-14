@@ -379,3 +379,100 @@ class TestPydanticEdgeCases:
         assert restored.name == "Alice"
         assert restored.email is None
         assert restored.phone is None
+
+
+
+class TestPydanticFieldAliases:
+    """Test Pydantic field alias support."""
+    
+    def test_field_alias_serialization(self):
+        """Test that field aliases are used during serialization."""
+        from pydantic import Field
+        
+        class User(BaseModel):
+            user_id: int = Field(alias="userId")
+            email_address: str = Field(alias="email")
+        
+        user = User(userId=123, email="test@example.com")
+        data = serialize(user)
+        
+        # Should use aliases, not field names
+        assert "userId" in data
+        assert "email" in data
+        assert "user_id" not in data
+        assert "email_address" not in data
+        assert data["userId"] == 123
+        assert data["email"] == "test@example.com"
+    
+    def test_field_alias_deserialization(self):
+        """Test that field aliases work during deserialization."""
+        from pydantic import Field
+        
+        class User(BaseModel):
+            user_id: int = Field(alias="userId")
+            email_address: str = Field(alias="email")
+        
+        data = {"userId": 456, "email": "user@example.com", "_serialized_type": "tests.unit.test_pydantic_integration.User"}
+        user = deserialize(data, expected_type=User)
+        
+        assert user.user_id == 456
+        assert user.email_address == "user@example.com"
+    
+    def test_nested_model_with_aliases(self):
+        """Test aliases in nested Pydantic models."""
+        from pydantic import Field
+        
+        class Address(BaseModel):
+            street_name: str = Field(alias="streetName")
+            zip_code: str = Field(alias="zipCode")
+        
+        class User(BaseModel):
+            user_id: int = Field(alias="userId")
+            home_address: Address = Field(alias="address")
+        
+        user = User(
+            userId=789,
+            address=Address(streetName="Main St", zipCode="12345")
+        )
+        data = serialize(user)
+        
+        assert "userId" in data
+        assert "address" in data
+        assert "streetName" in data["address"]
+        assert "zipCode" in data["address"]
+        assert data["userId"] == 789
+        assert data["address"]["streetName"] == "Main St"
+    
+    def test_alias_roundtrip(self):
+        """Test full roundtrip with aliases."""
+        from pydantic import Field
+        
+        class Product(BaseModel):
+            product_id: int = Field(alias="productId")
+            product_name: str = Field(alias="name")
+            unit_price: float = Field(alias="price")
+        
+        original = Product(productId=1, name="Widget", price=9.99)
+        data = serialize(original)
+        restored = deserialize(data, expected_type=Product)
+        
+        assert restored.product_id == original.product_id
+        assert restored.product_name == original.product_name
+        assert restored.unit_price == original.unit_price
+    
+    def test_mixed_aliases_and_regular_fields(self):
+        """Test model with both aliased and non-aliased fields."""
+        from pydantic import Field
+        
+        class Item(BaseModel):
+            id: int  # No alias
+            item_name: str = Field(alias="name")  # With alias
+            description: str  # No alias
+        
+        item = Item(id=1, name="Test", description="A test item")
+        data = serialize(item)
+        
+        assert "id" in data
+        assert "name" in data
+        assert "description" in data
+        assert "item_name" not in data

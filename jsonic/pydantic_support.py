@@ -56,7 +56,7 @@ def serialize_pydantic_model(obj: Any, serialize_private_attributes: bool = Fals
     Serialize a Pydantic model to a dictionary.
     
     Uses Pydantic's model_dump() (V2) or dict() (V1) method to get the data,
-    then adds Jsonic metadata. Returns raw Python dict that will be processed
+    respecting field aliases. Returns raw Python dict that will be processed
     by Jsonic's _preprocess_for_serialization.
     
     Args:
@@ -69,14 +69,15 @@ def serialize_pydantic_model(obj: Any, serialize_private_attributes: bool = Fals
     Note:
         The returned dict may contain sets, tuples, or other Python objects
         that will be handled by Jsonic's preprocessing step.
+        Field aliases are respected (by_alias=True).
     """
     # Use appropriate method based on Pydantic version
     if PYDANTIC_V2:
-        # Pydantic V2: use model_dump with mode='python' to get Python objects (not JSON)
-        data = obj.model_dump(mode='python', exclude_none=False)
+        # Pydantic V2: use model_dump with mode='python' and by_alias=True
+        data = obj.model_dump(mode='python', exclude_none=False, by_alias=True)
     else:
-        # Pydantic V1: use dict()
-        data = obj.dict(exclude_none=False)
+        # Pydantic V1: use dict() with by_alias=True
+        data = obj.dict(exclude_none=False, by_alias=True)
     
     # Add Jsonic type marker for deserialization
     data['_serialized_type'] = f"{obj.__class__.__module__}.{obj.__class__.__name__}"
