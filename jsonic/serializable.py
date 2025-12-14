@@ -105,7 +105,7 @@ class Serializable:
         register_jsonic_type(cls, cls.transient_attributes, cls.init_parameters_mapping)
 
 
-def serialize(obj, serialize_private_attributes=False, string_output=False):
+def serialize(obj, serialize_private_attributes=False, string_output=False, include=None, exclude=None):
     """
      Serializes ``class instance`` / ``dict`` / ``list`` / ``other python type`` into ``dictionary`` / ``json string`` representing the input
 
@@ -113,21 +113,103 @@ def serialize(obj, serialize_private_attributes=False, string_output=False):
         obj: ``object`` / ``class instance`` / ``dict`` / ``list`` to be serializes
         serialize_private_attributes: should serialize private attributes (attributes which their name starts with ``_``)
         string_output: serialize into json string or ``dict`` / ``list
+        include: optional list/set of field names to include (only these fields will be serialized)
+        exclude: optional list/set of field names to exclude (these fields will not be serialized)
 
     Returns:
         ``dictionary`` / ``json string`` representing the input
 
     Note:
         Only class instances of classes extending ``Serializable`` or registered using ``register_jsonic_type`` can be serialized
+        If both include and exclude are provided, include takes precedence
     """
     # Pre-process everything recursively - this handles tuples, sets, and all objects
     obj = _handle_serialization_error(
-        lambda: _preprocess_for_serialization(obj, serialize_private_attributes),
+        lambda: _preprocess_for_serialization(obj, serialize_private_attributes, ""),
         ""
     )
     
+    # Apply include/exclude filtering if this is a dict (serialized object)
+    if isinstance(obj, dict) and (include is not None or exclude is not None):
+        obj = _apply_field_filter(obj, include, exclude)
+    
     # Use custom encoder that handles nested enums
     json_str = json.dumps(obj, cls=EnumEncoder)
+    return json_str if string_output else json.loads(json_str)
+
+
+def _apply_field_filter(data, include=None, exclude=None, path=""):
+    """Apply include/exclude filtering to a dictionary with nested field support."""
+    if not isinstance(data, dict):
+        return data
+    
+    # Separate top-level and nested filters
+    top_include = set()
+    nested_include = {}
+    if include is not None:
+        for field in include:
+            if '.' in field:
+                parts = field.split('.', 1)
+                nested_include.setdefault(parts[0], set()).add(parts[1])
+            else:
+                top_include.add(field)
+    
+    top_exclude = set()
+    nested_exclude = {}
+    if exclude is not None:
+        for field in exclude:
+            if '.' in field:
+                parts = field.split('.', 1)
+                nested_exclude.setdefault(parts[0], set()).add(parts[1])
+            else:
+                top_exclude.add(field)
+    
+    result = {}
+    for key, value in data.items():
+        # Always keep _serialized_type
+        if key == '_serialized_type':
+            result[key] = value
+            continue
+        
+        # Check top-level filtering
+        if include is not None:
+            # If include is specified, only include fields in top_include or nested_include
+            if key not in top_include and key not in nested_include:
+                continue
+        if exclude is not None and key in top_exclude:
+            continue
+        
+        # Apply nested filtering recursively
+        if key in nested_include:
+            if isinstance(value, dict):
+                # Check if it's a set or tuple structure
+                if value.get('_is_set') or value.get('_is_tuple'):
+                    result[key] = dict(value)  # Copy structure
+                    if 'items' in value:
+                        result[key]['items'] = [_apply_field_filter(item, include=nested_include[key], exclude=None) if isinstance(item, dict) else item for item in value['items']]
+                else:
+                    result[key] = _apply_field_filter(value, include=nested_include[key], exclude=None)
+            elif isinstance(value, list):
+                result[key] = [_apply_field_filter(item, include=nested_include[key], exclude=None) if isinstance(item, dict) else item for item in value]
+            else:
+                result[key] = value
+        elif key in nested_exclude:
+            if isinstance(value, dict):
+                # Check if it's a set or tuple structure
+                if value.get('_is_set') or value.get('_is_tuple'):
+                    result[key] = dict(value)  # Copy structure
+                    if 'items' in value:
+                        result[key]['items'] = [_apply_field_filter(item, include=None, exclude=nested_exclude[key]) if isinstance(item, dict) else item for item in value['items']]
+                else:
+                    result[key] = _apply_field_filter(value, include=None, exclude=nested_exclude[key])
+            elif isinstance(value, list):
+                result[key] = [_apply_field_filter(item, include=None, exclude=nested_exclude[key]) if isinstance(item, dict) else item for item in value]
+            else:
+                result[key] = value
+        else:
+            result[key] = value
+    
+    return result
     return json_str if string_output else json.loads(json_str)
 
 

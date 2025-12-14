@@ -3,7 +3,7 @@
 [![PyPI version](https://badge.fury.io/py/py-jsonic.svg)](https://badge.fury.io/py/py-jsonic)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-383%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-436%20passing-brightgreen.svg)](tests/)
 
 **Jsonic** is a lightweight, Pythonic library for effortless JSON serialization and deserialization of Python objects. Built for modern Python with type hints, dataclasses, and developer experience in mind.
 
@@ -237,9 +237,81 @@ event = deserialize(data, string_input=True, expected_type=OrderEvent)
 
 ## 🔧 Advanced Features
 
+### Partial Serialization
+
+Control which fields to serialize with `include` and `exclude` parameters:
+
+```python
+@dataclass
+class User:
+    username: str
+    email: str
+    password_hash: str
+    api_token: str
+
+user = User("alice", "alice@example.com", "hash123", "token456")
+
+# Exclude sensitive fields
+safe_data = serialize(user, exclude={'password_hash', 'api_token'})
+# Result: {'username': 'alice', 'email': 'alice@example.com', ...}
+
+# Include only specific fields
+public_data = serialize(user, include={'username', 'email'})
+# Result: {'username': 'alice', 'email': 'alice@example.com', ...}
+```
+
+**Nested field filtering** with dot notation:
+
+```python
+@dataclass
+class Credentials:
+    username: str
+    password: str
+
+@dataclass
+class Database:
+    host: str
+    credentials: Credentials
+
+@dataclass
+class Config:
+    app_name: str
+    database: Database
+
+config = Config("MyApp", Database("localhost", Credentials("admin", "secret")))
+
+# Exclude nested password field
+safe_config = serialize(config, exclude={'database.credentials.password'})
+# Password is excluded, but username remains
+
+# Include only specific nested fields
+public_config = serialize(config, include={'app_name', 'database.host'})
+# Only app_name and database.host are included
+```
+
+**Filter fields in lists:**
+
+```python
+@dataclass
+class Item:
+    name: str
+    price: float
+    internal_cost: float
+
+@dataclass
+class Order:
+    order_id: str
+    items: List[Item]
+
+order = Order("ORD-123", [Item("Widget", 10.0, 5.0)])
+
+# Exclude internal_cost from all items
+public_order = serialize(order, exclude={'items.internal_cost'})
+```
+
 ### Transient Attributes
 
-Exclude fields from serialization:
+Exclude fields from serialization at the class level:
 
 ```python
 class User(Serializable):
