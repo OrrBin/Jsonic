@@ -452,7 +452,7 @@ Inspired by the Python community's need for simple, Pythonic serialization that 
 
 - **Issues**: [GitHub Issues](https://github.com/yourusername/jsonic/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/yourusername/jsonic/discussions)
-- **Email**: your.email@example.com
+- **Email**: orrbenyamini@gmail.com
 
 ---
 
