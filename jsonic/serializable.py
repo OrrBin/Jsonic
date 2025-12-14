@@ -7,6 +7,12 @@ from typing import List, Dict
 from jsonic.decorators import _JsonicSerializer, _JsonicDeserializer
 from jsonic.util import full_type_name, is_private_attribute
 from jsonic.exceptions import SerializationError, DeserializationError
+from jsonic.pydantic_support import (
+    is_pydantic_model,
+    is_pydantic_class,
+    serialize_pydantic_model,
+    deserialize_pydantic_model
+)
 
 SERIALIZED_TYPE_ATTRIBUTE_NAME = '_serialized_type'
 
@@ -229,6 +235,23 @@ def register_jsonic_type(cls, transient_attributes: List[str] = None,
 def _serialize_object(obj, serialize_private_attributes=False, path=""):
     """Serialize an object with path tracking for better error messages."""
     typ = type(obj)
+    
+    # Check for Pydantic model first (before other checks)
+    if is_pydantic_model(obj):
+        # Get the dict from Pydantic
+        pydantic_dict = serialize_pydantic_model(obj, serialize_private_attributes)
+        # Recursively process the dict to handle sets, tuples, nested objects
+        result = {}
+        for key, value in pydantic_dict.items():
+            if key == '_serialized_type':
+                result[key] = value
+            else:
+                key_path = f"{path}.{key}" if path else key
+                result[key] = _handle_serialization_error(
+                    lambda v=value, kp=key_path: _preprocess_for_serialization(v, serialize_private_attributes, kp),
+                    key_path
+                )
+        return result
     
     # Check if it's an Enum
     if isinstance(obj, Enum):
@@ -510,6 +533,10 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
 
     if expected_type and full_type_name(expected_type) != type_name:
         raise DeserializationError(f'Deserializing type {type_name}, which is not the expected type: {expected_type}', path)
+
+    # Check if it's a Pydantic model
+    if is_pydantic_class(cls):
+        return deserialize_pydantic_model(obj, cls)
 
     # Check if it's an Enum
     if isinstance(cls, type) and issubclass(cls, Enum):

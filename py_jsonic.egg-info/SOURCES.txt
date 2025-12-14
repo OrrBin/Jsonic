@@ -1,0 +1,17 @@
+LICENSE
+README.md
+setup.py
+jsonic/__init__.py
+jsonic/decorators.py
+jsonic/default_serializers.py
+jsonic/exceptions.py
+jsonic/pydantic_support.py
+jsonic/serializable.py
+jsonic/set_serializer.py
+jsonic/tuple_serializer.py
+jsonic/type_resolver.py
+jsonic/util.py
+py_jsonic.egg-info/PKG-INFO
+py_jsonic.egg-info/SOURCES.txt
+py_jsonic.egg-info/dependency_links.txt
+py_jsonic.egg-info/top_level.txt
