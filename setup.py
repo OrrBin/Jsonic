@@ -5,14 +5,14 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="py-jsonic",
-    version="1.0.0",
+    version="1.0.1",
     author="Orr Benyamini",
     author_email="orrbenyamini@gmail.com",
     description="lightweight utility for JSON serialization",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/OrrBin/Jsonic",
-    packages=['jsonic'],
+    packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
