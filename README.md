@@ -32,9 +32,11 @@ user_copy = deserialize(json_data, expected_type=User)  # Type-safe!
 - 🚀 **Modern Python** - Built for Python 3.8+ with dataclasses and type hints
 - 📦 **Rich Types** - Supports tuples, sets, enums, datetime, `__slots__`, and more
 - 🎨 **Flexible** - Custom serializers, transient fields, private attribute control
+- 🔍 **Partial Serialization** - Include/exclude fields with nested dot notation
+- 🤝 **Pydantic Integration** - Seamless support for Pydantic models and field aliases
 - 🐛 **Great Errors** - Detailed error messages with exact path to the problem
 - ⚡ **Fast** - Minimal overhead, optimized for performance
-- 🧪 **Well Tested** - 383 tests with >95% coverage
+- 🧪 **Well Tested** - 448 tests with >95% coverage
 
 ---
 
@@ -397,6 +399,33 @@ assert isinstance(restored.coordinates, tuple)
 assert isinstance(restored.unique_ids, set)
 ```
 
+### Pydantic Models
+
+Jsonic seamlessly integrates with Pydantic models:
+
+```python
+from pydantic import BaseModel, Field
+
+class User(BaseModel):
+    name: str
+    email: str
+    age: int = Field(ge=0, le=150)
+    nickname: str = Field(alias="display_name")
+
+# Serialize Pydantic models
+user = User(name="Alice", email="alice@example.com", age=30, display_name="Ally")
+data = serialize(user)  # Respects field aliases
+
+# Deserialize to Pydantic models
+user_copy = deserialize(data, expected_type=User)  # Full validation
+```
+
+**Pydantic features supported:**
+- Auto-detection of Pydantic models
+- Field aliases (`alias`, `validation_alias`, `serialization_alias`)
+- Nested Pydantic models
+- Pydantic validators run on deserialization
+
 ---
 
 ## 🐛 Error Handling
@@ -444,6 +473,9 @@ except TypeError as e:
 |---------|--------|----------|-------------|------------------|
 | Zero config for dataclasses | ✅ | ✅ | ❌ | ✅ |
 | Type hints support | ✅ | ✅ | ⚠️ | ✅ |
+| Pydantic integration | ✅ | N/A | ❌ | ❌ |
+| Partial serialization | ✅ | ⚠️ | ⚠️ | ❌ |
+| Nested field filtering | ✅ | ❌ | ❌ | ❌ |
 | Validation | ⚠️ | ✅ | ✅ | ❌ |
 | Tuples/Sets support | ✅ | ⚠️ | ❌ | ❌ |
 | `__slots__` support | ✅ | ❌ | ❌ | ❌ |
@@ -457,9 +489,11 @@ except TypeError as e:
 - You're working with existing classes you can't modify
 - You need `__slots__`, tuples, or sets support
 - You want great error messages out of the box
+- You need fine-grained control over serialization (include/exclude nested fields)
+- You want to work with both dataclasses and Pydantic models
 
 **When to use alternatives:**
-- **Pydantic**: You need extensive validation and FastAPI integration
+- **Pydantic**: You need extensive validation and FastAPI integration (but Jsonic can serialize Pydantic models!)
 - **marshmallow**: You need complex validation rules and transformations
 - **dataclasses-json**: You only need basic dataclass serialization
 

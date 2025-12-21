@@ -5,6 +5,8 @@ Comprehensive examples for common use cases and patterns.
 ## Table of Contents
 
 - [Basic Examples](#basic-examples)
+- [Pydantic Integration](#pydantic-integration)
+- [Partial Serialization](#partial-serialization)
 - [API Integration](#api-integration)
 - [Database Persistence](#database-persistence)
 - [Microservices](#microservices)
@@ -94,6 +96,536 @@ restored = deserialize(data, expected_type=DataContainer)
 # Types are preserved
 assert isinstance(restored.unique_ids, set)
 assert isinstance(restored.coordinates, tuple)
+```
+
+---
+
+## Pydantic Integration
+
+### Basic Pydantic Model
+
+```python
+from pydantic import BaseModel, Field
+from jsonic import serialize, deserialize
+
+class User(BaseModel):
+    name: str
+    email: str
+    age: int = Field(ge=0, le=150)
+
+# Serialize Pydantic model
+user = User(name="Alice", email="alice@example.com", age=30)
+data = serialize(user)
+
+# Deserialize to Pydantic model (with validation)
+user_copy = deserialize(data, expected_type=User)
+```
+
+### Field Aliases
+
+```python
+from pydantic import BaseModel, Field
+from jsonic import serialize, deserialize
+
+class APIUser(BaseModel):
+    user_id: str = Field(alias="userId")
+    full_name: str = Field(alias="fullName")
+    email_address: str = Field(alias="emailAddress")
+
+# Serialize with aliases
+user = APIUser(userId="123", fullName="Alice Smith", emailAddress="alice@example.com")
+data = serialize(user)
+# Result: {'userId': '123', 'fullName': 'Alice Smith', 'emailAddress': 'alice@example.com', ...}
+
+# Deserialize respects aliases
+user_copy = deserialize(data, expected_type=APIUser)
+```
+
+### Nested Pydantic Models
+
+```python
+from pydantic import BaseModel
+from typing import List
+from jsonic import serialize, deserialize
+
+class Address(BaseModel):
+    street: str
+    city: str
+    country: str
+
+class Company(BaseModel):
+    name: str
+    address: Address
+
+class Employee(BaseModel):
+    name: str
+    email: str
+    company: Company
+    skills: List[str]
+
+# Create nested structure
+employee = Employee(
+    name="Bob",
+    email="bob@example.com",
+    company=Company(
+        name="Tech Corp",
+        address=Address(
+            street="123 Main St",
+            city="San Francisco",
+            country="USA"
+        )
+    ),
+    skills=["Python", "JavaScript"]
+)
+
+# Serialize and deserialize
+data = serialize(employee)
+employee_copy = deserialize(data, expected_type=Employee)
+```
+
+### Pydantic Validators
+
+```python
+from pydantic import BaseModel, validator, Field
+from jsonic import serialize, deserialize
+
+class Product(BaseModel):
+    name: str
+    price: float = Field(gt=0)
+    discount: float = Field(ge=0, le=1)
+    
+    @validator('name')
+    def name_must_not_be_empty(cls, v):
+        if not v.strip():
+            raise ValueError('Name cannot be empty')
+        return v.strip()
+    
+    @validator('discount')
+    def discount_valid(cls, v, values):
+        if 'price' in values and v >= values['price']:
+            raise ValueError('Discount cannot exceed price')
+        return v
+
+# Validators run during deserialization
+data = {
+    'name': '  Laptop  ',
+    'price': 999.99,
+    'discount': 0.1,
+    '_serialized_type': 'Product'
+}
+
+product = deserialize(data, expected_type=Product)
+assert product.name == "Laptop"  # Trimmed by validator
+```
+
+### FastAPI Integration
+
+```python
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+from typing import List, Optional
+from jsonic import serialize, deserialize
+
+app = FastAPI()
+
+class CreateUserRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=20)
+    email: str = Field(pattern=r'^[\w\.-]+@[\w\.-]+\.\w+$')
+    full_name: str
+
+class UserResponse(BaseModel):
+    id: str
+    username: str
+    email: str
+    full_name: str
+    created_at: str
+
+# In-memory storage (serialized)
+users_db = {}
+
+@app.post("/users", response_model=UserResponse)
+def create_user(user: CreateUserRequest):
+    # Pydantic validates automatically
+    user_id = str(len(users_db) + 1)
+    
+    # Store serialized version
+    user_data = serialize(user)
+    user_data['id'] = user_id
+    user_data['created_at'] = '2025-12-21T10:00:00'
+    users_db[user_id] = user_data
+    
+    # Return as Pydantic model
+    return deserialize(user_data, expected_type=UserResponse)
+
+@app.get("/users/{user_id}", response_model=UserResponse)
+def get_user(user_id: str):
+    if user_id not in users_db:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return deserialize(users_db[user_id], expected_type=UserResponse)
+```
+
+### Mixing Dataclasses and Pydantic
+
+```python
+from dataclasses import dataclass
+from pydantic import BaseModel
+from typing import List
+from jsonic import serialize, deserialize
+
+# Dataclass for internal use
+@dataclass
+class InternalMetadata:
+    created_by: str
+    version: int
+
+# Pydantic for API
+class APIProduct(BaseModel):
+    name: str
+    price: float
+
+# Combined model
+@dataclass
+class Product:
+    api_data: APIProduct
+    metadata: InternalMetadata
+
+# Works seamlessly
+product = Product(
+    api_data=APIProduct(name="Widget", price=19.99),
+    metadata=InternalMetadata(created_by="admin", version=1)
+)
+
+data = serialize(product)
+product_copy = deserialize(data, expected_type=Product)
+```
+
+### Pydantic Config Options
+
+```python
+from pydantic import BaseModel, ConfigDict
+from jsonic import serialize, deserialize
+
+class StrictUser(BaseModel):
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        str_min_length=1,
+        validate_assignment=True
+    )
+    
+    name: str
+    email: str
+
+# Pydantic config is respected
+user = StrictUser(name="  Alice  ", email="alice@example.com")
+assert user.name == "Alice"  # Whitespace stripped
+
+data = serialize(user)
+user_copy = deserialize(data, expected_type=StrictUser)
+```
+
+### Optional Fields and Defaults
+
+```python
+from pydantic import BaseModel, Field
+from typing import Optional, List
+from jsonic import serialize, deserialize
+
+class UserProfile(BaseModel):
+    username: str
+    bio: Optional[str] = None
+    age: Optional[int] = None
+    tags: List[str] = Field(default_factory=list)
+    is_active: bool = True
+
+# Minimal data
+user = UserProfile(username="alice")
+data = serialize(user)
+
+# Deserialize with defaults
+user_copy = deserialize(data, expected_type=UserProfile)
+assert user_copy.tags == []
+assert user_copy.is_active == True
+```
+
+---
+
+## Partial Serialization
+
+### Exclude Sensitive Fields
+
+```python
+from dataclasses import dataclass
+from jsonic import serialize
+
+@dataclass
+class User:
+    username: str
+    email: str
+    password_hash: str
+    api_token: str
+    credit_card: str
+
+user = User(
+    username="alice",
+    email="alice@example.com",
+    password_hash="hash123",
+    api_token="token456",
+    credit_card="1234-5678-9012-3456"
+)
+
+# Exclude sensitive fields for API response
+safe_data = serialize(user, exclude={'password_hash', 'api_token', 'credit_card'})
+# Result: {'username': 'alice', 'email': 'alice@example.com', ...}
+```
+
+### Include Only Specific Fields
+
+```python
+from dataclasses import dataclass
+from jsonic import serialize
+
+@dataclass
+class Employee:
+    id: str
+    name: str
+    email: str
+    salary: float
+    ssn: str
+    performance_review: str
+
+employee = Employee(
+    id="EMP-123",
+    name="Bob Smith",
+    email="bob@company.com",
+    salary=75000.0,
+    ssn="123-45-6789",
+    performance_review="Excellent work..."
+)
+
+# Public profile - only include safe fields
+public_profile = serialize(employee, include={'id', 'name', 'email'})
+# Result: {'id': 'EMP-123', 'name': 'Bob Smith', 'email': 'bob@company.com', ...}
+```
+
+### Nested Field Filtering
+
+```python
+from dataclasses import dataclass
+from jsonic import serialize
+
+@dataclass
+class Credentials:
+    username: str
+    password: str
+    api_key: str
+
+@dataclass
+class Database:
+    host: str
+    port: int
+    credentials: Credentials
+
+@dataclass
+class Config:
+    app_name: str
+    version: str
+    database: Database
+
+config = Config(
+    app_name="MyApp",
+    version="1.0.0",
+    database=Database(
+        host="db.example.com",
+        port=5432,
+        credentials=Credentials(
+            username="admin",
+            password="secret123",
+            api_key="key456"
+        )
+    )
+)
+
+# Exclude nested password and api_key
+safe_config = serialize(config, exclude={'database.credentials.password', 'database.credentials.api_key'})
+# Result: Config with username but no password/api_key
+```
+
+### Filter Fields in Lists
+
+```python
+from dataclasses import dataclass
+from typing import List
+from jsonic import serialize
+
+@dataclass
+class Product:
+    name: str
+    price: float
+    cost: float  # Internal cost
+    supplier: str  # Internal info
+
+@dataclass
+class Order:
+    order_id: str
+    customer: str
+    items: List[Product]
+
+order = Order(
+    order_id="ORD-123",
+    customer="Alice",
+    items=[
+        Product("Widget", 19.99, 10.00, "Supplier A"),
+        Product("Gadget", 29.99, 15.00, "Supplier B")
+    ]
+)
+
+# Exclude internal fields from all items
+public_order = serialize(order, exclude={'items.cost', 'items.supplier'})
+# Items only have name and price
+```
+
+### API Response Filtering
+
+```python
+from dataclasses import dataclass
+from typing import List, Optional
+from datetime import datetime
+from jsonic import serialize
+
+@dataclass
+class Comment:
+    id: str
+    text: str
+    author: str
+    author_email: str
+    author_ip: str
+    created_at: datetime
+
+@dataclass
+class BlogPost:
+    id: str
+    title: str
+    content: str
+    author: str
+    author_email: str
+    draft_notes: str
+    comments: List[Comment]
+
+post = BlogPost(
+    id="POST-1",
+    title="My Blog Post",
+    content="Content here...",
+    author="Alice",
+    author_email="alice@example.com",
+    draft_notes="Remember to add images",
+    comments=[
+        Comment(
+            id="C1",
+            text="Great post!",
+            author="Bob",
+            author_email="bob@example.com",
+            author_ip="192.168.1.1",
+            created_at=datetime.now()
+        )
+    ]
+)
+
+# Public API response - exclude all sensitive data
+public_post = serialize(
+    post,
+    exclude={
+        'author_email',
+        'draft_notes',
+        'comments.author_email',
+        'comments.author_ip'
+    }
+)
+```
+
+### Dynamic Field Selection
+
+```python
+from dataclasses import dataclass
+from typing import Set
+from jsonic import serialize
+
+@dataclass
+class UserProfile:
+    username: str
+    email: str
+    phone: str
+    address: str
+    bio: str
+    preferences: dict
+
+def serialize_for_role(user: UserProfile, role: str) -> dict:
+    """Serialize user based on viewer's role"""
+    
+    if role == "admin":
+        # Admins see everything
+        return serialize(user)
+    
+    elif role == "friend":
+        # Friends see most fields
+        return serialize(user, exclude={'preferences'})
+    
+    elif role == "public":
+        # Public sees minimal info
+        return serialize(user, include={'username', 'bio'})
+    
+    else:
+        return serialize(user, include={'username'})
+
+user = UserProfile(
+    username="alice",
+    email="alice@example.com",
+    phone="555-1234",
+    address="123 Main St",
+    bio="Software developer",
+    preferences={"theme": "dark"}
+)
+
+admin_view = serialize_for_role(user, "admin")
+friend_view = serialize_for_role(user, "friend")
+public_view = serialize_for_role(user, "public")
+```
+
+### Logging Without Sensitive Data
+
+```python
+from dataclasses import dataclass
+from datetime import datetime
+from jsonic import serialize
+import logging
+
+@dataclass
+class PaymentRequest:
+    transaction_id: str
+    amount: float
+    currency: str
+    card_number: str
+    cvv: str
+    timestamp: datetime
+
+def process_payment(payment: PaymentRequest):
+    # Log without sensitive data
+    log_data = serialize(payment, exclude={'card_number', 'cvv'})
+    logging.info(f"Processing payment: {log_data}")
+    
+    # Process with full data
+    # ... payment processing logic ...
+
+payment = PaymentRequest(
+    transaction_id="TXN-123",
+    amount=99.99,
+    currency="USD",
+    card_number="1234-5678-9012-3456",
+    cvv="123",
+    timestamp=datetime.now()
+)
+
+process_payment(payment)
 ```
 
 ---

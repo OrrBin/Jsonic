@@ -1,6 +1,6 @@
 # Jsonic Roadmap
 
-## Current State (v1.0)
+## Current State (v1.1)
 - ✅ Dataclass support with type hints
 - ✅ Tuple and set serialization
 - ✅ `__slots__` support
@@ -10,7 +10,10 @@
 - ✅ Error messages with path context
 - ✅ Type not found suggestions
 - ✅ Thread-safe operations
-- ✅ 383 passing tests
+- ✅ 448 passing tests
+- ✅ **Partial serialization with nested field filtering** (include/exclude with dot notation)
+- ✅ **Pydantic integration** (auto-detection, field aliases, nested models)
+- ✅ **Comprehensive documentation** (examples, API reference, migration guides)
 
 ---
 
@@ -26,12 +29,10 @@
 - **API**: `deserialize(data, validate=True, strict=False)`
 - **Use case**: API responses, database reads, config files
 
-#### 2. Partial Serialization (Value: 8/10, Effort: 3/10)
-- **What**: Serialize only specific fields
-- **Why**: Reduce payload size, control what gets exposed
-- **Effort**: ~2 days
-- **API**: `serialize(obj, include=['field1', 'field2'])` or `exclude=['password']`
-- **Use case**: API responses, logging sensitive data
+#### 2. ~~Partial Serialization~~ ✅ **COMPLETED**
+- ✅ Implemented with `include` and `exclude` parameters
+- ✅ Supports nested field filtering with dot notation
+- ✅ Works with lists and nested objects
 
 #### 3. Serialization Hooks (Value: 8/10, Effort: 2/10)
 - **What**: Pre/post serialization callbacks
@@ -40,23 +41,21 @@
 - **API**: `@pre_serialize`, `@post_deserialize` decorators
 - **Use case**: Timestamps, computed fields, data migration
 
-#### 4. Better Documentation (Value: 9/10, Effort: 2/10)
-- **What**: Comprehensive docs with examples, API reference
-- **Why**: Easier adoption, fewer support questions
-- **Effort**: ~2-3 days
-- **Deliverables**: Sphinx docs, more README examples, migration guide
+#### 4. ~~Better Documentation~~ ✅ **COMPLETED**
+- ✅ Complete documentation overhaul
+- ✅ Comprehensive README with examples
+- ✅ API reference and migration guides
 
 ---
 
 ### 💎 High Value, Medium Effort (Strategic)
 **Target: 1-2 months**
 
-#### 5. Pydantic Integration (Value: 9/10, Effort: 5/10)
-- **What**: Seamless interop with Pydantic models
-- **Why**: Pydantic is extremely popular, expands user base
-- **Effort**: ~1 week
-- **API**: Auto-detect Pydantic models, use their validators
-- **Use case**: FastAPI apps, data validation pipelines
+#### 5. ~~Pydantic Integration~~ ✅ **COMPLETED**
+- ✅ Auto-detection of Pydantic models
+- ✅ Field alias support (alias, validation_alias, serialization_alias)
+- ✅ Nested Pydantic model handling
+- ✅ Comprehensive test coverage and examples
 
 #### 6. JSON Schema Generation (Value: 8/10, Effort: 5/10)
 - **What**: Generate JSON Schema from Python classes
@@ -178,21 +177,21 @@
 
 ## Recommended Implementation Order
 
-### Phase 1: Foundation (Weeks 1-4)
-1. **Schema Validation** - Critical for production use
-2. **Partial Serialization** - Common request, easy win
-3. **Serialization Hooks** - Enables many use cases
-4. **Better Documentation** - Drives adoption
+### ~~Phase 1: Foundation~~ ✅ **MOSTLY COMPLETED** (Weeks 1-4)
+1. ~~**Schema Validation**~~ - **PENDING** - Critical for production use
+2. ~~**Partial Serialization**~~ ✅ **COMPLETED** - Common request, easy win
+3. ~~**Serialization Hooks**~~ - **PENDING** - Enables many use cases
+4. ~~**Better Documentation**~~ ✅ **COMPLETED** - Drives adoption
 
-**Impact**: Makes Jsonic production-ready for most use cases
+**Status**: 2/4 completed. Partial serialization and documentation are done.
 
-### Phase 2: Ecosystem (Weeks 5-12)
-5. **Pydantic Integration** - Massive user base
+### Phase 2: Ecosystem ⏳ **IN PROGRESS** (Weeks 5-12)
+5. ~~**Pydantic Integration**~~ ✅ **COMPLETED** - Massive user base
 6. **JSON Schema Generation** - API documentation
 7. **Performance Optimization** - Competitive advantage
 8. **Versioning Support** - Enterprise requirement
 
-**Impact**: Positions Jsonic as enterprise-grade solution
+**Status**: 1/4 completed. Pydantic integration is fully implemented.
 
 ### Phase 3: Advanced (Months 4-6)
 9. **Async Support** - Modern Python requirement
@@ -231,8 +230,9 @@
 
 ### vs. Pydantic
 - ✅ **Jsonic**: Simpler, no schema required, works with existing classes
+- ✅ **Jsonic**: **Now has Pydantic integration** - seamless interop with Pydantic models
 - ❌ **Jsonic**: Less validation, no FastAPI integration (yet)
-- **Strategy**: Position as "lightweight alternative" + add Pydantic bridge
+- **Strategy**: Position as "lightweight alternative" + Pydantic bridge ✅ **DONE**
 
 ### vs. marshmallow
 - ✅ **Jsonic**: Type hints, less boilerplate, better errors
@@ -302,5 +302,23 @@
 
 ---
 
-*Last updated: 2025-12-13*
-*Version: 1.0*
+*Last updated: 2025-12-21*
+*Version: 1.1*
+
+## Recent Progress (December 2025)
+
+### ✅ Completed Features
+- **Partial Serialization**: Full support for `include`/`exclude` with nested dot notation
+- **Pydantic Integration**: Auto-detection, field aliases, nested models, comprehensive tests
+- **Documentation Overhaul**: Complete README rewrite, examples, API reference
+
+### 📊 Impact
+- Test coverage increased: 383 → 448 tests
+- Major ecosystem integration: Pydantic support opens FastAPI/validation use cases
+- Developer experience: Nested field filtering significantly improves API flexibility
+
+### 🎯 Next Priorities
+1. **Schema Validation** - Complete Phase 1 foundation
+2. **Serialization Hooks** - Enable transformation use cases
+3. **JSON Schema Generation** - API documentation tooling
+4. **Performance Optimization** - Benchmark and optimize hot paths
