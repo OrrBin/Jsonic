@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="py-jsonic",
-    version="0.0.2",
+    version="1.0.0",
     author="Orr Benyamini",
     author_email="orrbenyamini@gmail.com",
     description="lightweight utility for JSON serialization",

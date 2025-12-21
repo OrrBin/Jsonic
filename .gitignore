@@ -9,6 +9,7 @@ sample.mind.gz
 /helping.proto
 /build/
 /dist/
+*.egg-info/
 __pycache__/
 *.pyc
 *.pyo
