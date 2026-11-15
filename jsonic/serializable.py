@@ -435,13 +435,8 @@ def _serialize_object(obj, serialize_private_attributes=False, path=""):
     if is_jsonic_type:
         type_data = Serializable.jsonic_types[type_name]
         
-        # Handle both __dict__ and __slots__
-        # If __dict__ exists but is empty and __slots__ exists, use __slots__
-        has_dict = hasattr(obj, '__dict__') and len(obj.__dict__) > 0
-        has_slots = hasattr(obj, '__slots__')
-        
-        if has_dict or has_slots:
-            names = list(vars(obj)) if has_dict else [name for name in _get_all_slots(typ) if hasattr(obj, name)]
+        if hasattr(obj, '__dict__') or hasattr(obj, '__slots__'):
+            names = _get_attribute_names(obj)
             result = _serialize_fields(names, lambda key: getattr(obj, key),
                                        serialize_private_attributes, path, type_data.transient_attributes)
             result[SERIALIZED_TYPE_ATTRIBUTE_NAME] = type_name
@@ -464,7 +459,7 @@ def _serialize_object(obj, serialize_private_attributes=False, path=""):
     
     # Fallback: Generic object with __dict__ or __slots__.
     if hasattr(obj, '__dict__') or hasattr(obj, '__slots__'):
-        names = list(vars(obj)) if hasattr(obj, '__dict__') else [name for name in _get_all_slots(typ) if hasattr(obj, name)]
+        names = _get_attribute_names(obj)
         result = _serialize_fields(names, lambda key: getattr(obj, key), serialize_private_attributes, path)
         result[SERIALIZED_TYPE_ATTRIBUTE_NAME] = type_name
         return result
@@ -473,17 +468,32 @@ def _serialize_object(obj, serialize_private_attributes=False, path=""):
 
 
 def _get_all_slots(cls):
-    """Get all __slots__ from a class and its bases."""
+    """Return distinct storage names, walking the MRO from most derived."""
     slots = []
-    for c in cls.__mro__:
-        if hasattr(c, '__slots__'):
-            c_slots = c.__slots__
-            # __slots__ can be a string, list, or tuple
-            if isinstance(c_slots, str):
-                slots.append(c_slots)
-            else:
-                slots.extend(c_slots)
+    for owner in cls.__mro__:
+        declared = owner.__dict__.get('__slots__', ())
+        if isinstance(declared, str):
+            declared = (declared,)
+        for name in declared:
+            if name in ('__dict__', '__weakref__'):
+                continue
+            # Slot descriptors store name-mangled private attributes.
+            if name.startswith('__') and not name.endswith('__'):
+                class_name = owner.__name__.lstrip('_')
+                if class_name:
+                    name = '_' + class_name + name
+            if name not in slots:
+                slots.append(name)
     return slots
+
+
+def _get_attribute_names(obj):
+    """Merge dynamic and initialized slot attributes without infrastructure."""
+    names = list(vars(obj)) if hasattr(obj, '__dict__') else []
+    for name in _get_all_slots(type(obj)):
+        if name not in names and hasattr(obj, name):
+            names.append(name)
+    return names
 
 
 def _deserialize_with_custom_deserializer(obj, expected_type: type = None, path=""):

@@ -22,8 +22,8 @@ class TypeHintedResolver(TypeResolver):
     
     def serialize(self, obj: Any, serialize_private_attributes: bool = True) -> Dict[str, Any]:
         """Serialize object by extracting __dict__ or __slots__, handling tuples and sets."""
-        from jsonic.serializable import _serialize_fields, _get_all_slots
-        names = list(vars(obj)) if hasattr(obj, '__dict__') and vars(obj) else [name for name in _get_all_slots(type(obj)) if hasattr(obj, name)]
+        from jsonic.serializable import _serialize_fields, _get_attribute_names
+        names = _get_attribute_names(obj)
         return _serialize_fields(names, lambda key: getattr(obj, key), serialize_private_attributes)
 
     def deserialize(self, data: Dict[str, Any], cls: Type) -> Any:

@@ -1,5 +1,14 @@
 # Unreleased
 
+## F07 — mixed dictionary/slot layouts (#9)
+
+Registered types, generic objects and type-hinted resolvers share an attribute
+enumerator combining dynamic attributes with initialized slots throughout the
+MRO. It excludes infrastructure, deduplicates storage names, and handles
+name-mangled private slots. Private, transient and selection rules apply to
+both layouts. Payloads now contain previously lost slot fields; exact-output
+consumers should account for those additional fields.
+
 ## F06 — combined enum flags (#8)
 
 `Flag` and `IntFlag` reconstruct from their stored numeric value, preserving
