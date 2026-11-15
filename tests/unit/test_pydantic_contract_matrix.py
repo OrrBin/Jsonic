@@ -17,6 +17,13 @@ class Parent(pydantic.BaseModel):
     items: Any
 
 
+@pytest.mark.parametrize('value', [None, 42, 'Model', object(), str])
+def test_optional_model_detection_rejects_non_models(value):
+    from jsonic.pydantic_support import is_pydantic_class, is_pydantic_model
+    assert is_pydantic_class(value) is False
+    assert is_pydantic_model(value) is False
+
+
 @pytest.mark.parametrize('shape', ['model', 'list', 'tuple', 'dict'])
 @pytest.mark.parametrize('selection', ['include', 'exclude'])
 def test_nested_wire_aliases_and_selectors(shape, selection):

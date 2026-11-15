@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from jsonic import deserialize, serialize, jsonic_serializer, jsonic_deserializer
+from jsonic import Serializable, deserialize, serialize, jsonic_serializer, jsonic_deserializer, register_jsonic_type
 from jsonic.decorators import _JsonicSerializer, _JsonicDeserializer
 from jsonic.exceptions import DeserializationError
 from jsonic.util import full_type_name
@@ -109,3 +109,34 @@ def test_typehinted_defaults_are_used_when_omitted():
             self.value = value
     payload = {'_serialized_type': full_type_name(Defaulted)}
     assert deserialize(payload, expected_type=Defaulted).value == 7
+
+
+def test_unknown_type_with_empty_registry_has_no_misleading_suggestions(monkeypatch):
+    monkeypatch.setattr(Serializable, 'jsonic_types', {})
+    with pytest.raises(TypeError, match='Could not find type: never_imported.Unknown') as error:
+        deserialize({'_serialized_type': 'never_imported.Unknown'})
+    assert 'Registered types' not in str(error.value)
+    assert 'Did you mean' not in str(error.value)
+
+
+def test_unrelated_registry_suggestions_are_bounded(monkeypatch):
+    monkeypatch.setattr(Serializable, 'jsonic_types', {})
+    names = []
+    for i in range(8):
+        cls = type('RecordNumber' + str(i), (), {'__module__': 'example_models'})
+        register_jsonic_type(cls)
+        names.append(full_type_name(cls))
+    with pytest.raises(TypeError) as error:
+        deserialize({'_serialized_type': 'missing_package.ZzzUnrelated'})
+    message = str(error.value)
+    assert all(name in message for name in names[:5])
+    assert all(name not in message for name in names[5:])
+    assert 'and 3 more' in message
+
+
+def test_legacy_enum_payload_without_member_name_can_reconstruct_by_value():
+    from enum import Enum
+    class Number(Enum):
+        ONE = 1
+    payload = {'_serialized_type': full_type_name(Number), 'name': None, 'value': 1}
+    assert deserialize(payload, expected_type=Number, safe=True) is Number.ONE
