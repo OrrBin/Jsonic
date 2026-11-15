@@ -2,7 +2,7 @@ import importlib
 import inspect
 import json
 from contextvars import ContextVar
-from enum import Enum
+from enum import Enum, Flag
 from typing import List, Dict
 
 from jsonic.decorators import _JsonicSerializer, _JsonicDeserializer
@@ -646,13 +646,17 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
 
     # Check if it's an Enum
     if isinstance(cls, type) and issubclass(cls, Enum):
-        # Deserialize enum by name (more reliable than value for aliases)
-        # For combined flags, name might be None, use value instead
-        if obj['name'] is not None:
-            return cls[obj['name']]
-        else:
+        try:
+            # Combined Flag names (e.g. READ|WRITE) are not member-map keys.
+            # Let the class enforce its declared unknown-bit boundary policy.
+            if issubclass(cls, Flag):
+                return cls(obj['value'])
+            if obj['name'] is not None:
+                return cls[obj['name']]
             return cls(obj['value'])
-    
+        except (KeyError, ValueError, TypeError) as exc:
+            raise DeserializationError(f"Invalid enum payload for {full_type_name(cls)}", path) from exc
+
     # Try type resolver (but not for Serializable types - they have priority)
     if not is_jsonic_type:
         from jsonic.type_resolver import get_resolver_for_type
