@@ -1,5 +1,13 @@
 # Unreleased
 
+## F05 — preserve decoding input (#7)
+
+Custom decoders receive a separate outer dictionary without the type tag.
+Success, failure and concurrent readers no longer observe removed metadata.
+This is a shallow copy: nested values retain their identity and custom hooks
+must treat them as read-only if caller input must remain unchanged. Built-in
+decoders do not mutate nested input. Wire format and callback shape stay stable.
+
 ## F04 — expected types and codec identity (#6)
 
 Root `expected_type` now uses exact Python type identity on every decode path,
