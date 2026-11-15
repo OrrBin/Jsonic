@@ -19,6 +19,7 @@ SERIALIZED_TYPE_ATTRIBUTE_NAME = '_serialized_type'
 
 # A call-local policy also reaches legacy callbacks that recursively call deserialize.
 _safe_types = ContextVar('jsonic_safe_types', default=None)
+_selection = ContextVar('jsonic_field_selection', default=None)
 
 
 class EnumEncoder(json.JSONEncoder):
@@ -125,96 +126,88 @@ def serialize(obj, serialize_private_attributes=False, string_output=False, incl
 
     Note:
         Only class instances of classes extending ``Serializable`` or registered using ``register_jsonic_type`` can be serialized
-        If both include and exclude are provided, include takes precedence
+        If both include and exclude select a field, exclude takes precedence
     """
-    # Pre-process everything recursively - this handles tuples, sets, and all objects
-    obj = _handle_serialization_error(
-        lambda: _preprocess_for_serialization(obj, serialize_private_attributes, ""),
-        ""
-    )
-    
-    # Apply include/exclude filtering if this is a dict (serialized object)
-    if isinstance(obj, dict) and (include is not None or exclude is not None):
-        obj = _apply_field_filter(obj, include, exclude)
-    
+    token = _selection.set(_FieldSelection(include, exclude))
+    try:
+        obj = _handle_serialization_error(
+            lambda: _preprocess_for_serialization(obj, serialize_private_attributes, ""), ""
+        )
+    finally:
+        _selection.reset(token)
+
     # Use custom encoder that handles nested enums
     json_str = json.dumps(obj, cls=EnumEncoder)
     return json_str if string_output else json.loads(json_str)
 
 
+class _FieldSelection:
+    """Compile dotted selectors once per field scope; exclusion always wins."""
+    def __init__(self, include=None, exclude=None):
+        self.include = None if include is None else frozenset(include)
+        self.exclude = frozenset(exclude or ())
+        self.inc = self._split(self.include or ())
+        self.exc = self._split(self.exclude)
+
+    @staticmethod
+    def _split(paths):
+        result = {}
+        for field in paths:
+            head, dot, tail = field.partition('.')
+            result.setdefault(head, set()).add(tail if dot else '')
+        return result
+
+    def child(self, key):
+        inc = self.inc.get(key, set())
+        exc = self.exc.get(key, set())
+        if '' in exc or (self.include is not None and not inc):
+            return None
+        return _FieldSelection(None if self.include is None or '' in inc else inc, exc)
+
+
+def _serialize_fields(names, getter, private=False, path="", transient=(), filter_private=True):
+    """Select a field before reading or traversing its value."""
+    selection = _selection.get() or _FieldSelection()
+    result = {}
+    for key in names:
+        if key == SERIALIZED_TYPE_ATTRIBUTE_NAME:
+            continue
+        if filter_private and not private and key.startswith('_'):
+            continue
+        if key in transient:
+            continue
+        child = selection.child(key)
+        if child is None:
+            continue
+        key_path = f"{path}.{key}" if path else str(key)
+        token = _selection.set(child)
+        try:
+            result[key] = _handle_serialization_error(
+                lambda: _preprocess_for_serialization(getter(key), private, key_path), key_path
+            )
+        finally:
+            _selection.reset(token)
+    return result
+
+
 def _apply_field_filter(data, include=None, exclude=None, path=""):
-    """Apply include/exclude filtering to a dictionary with nested field support."""
+    """Filter custom codec output; codecs control their own value extraction."""
+    if isinstance(data, list):
+        return [_apply_field_filter(v, include, exclude) for v in data]
     if not isinstance(data, dict):
         return data
-    
-    # Separate top-level and nested filters
-    top_include = set()
-    nested_include = {}
-    if include is not None:
-        for field in include:
-            if '.' in field:
-                parts = field.split('.', 1)
-                nested_include.setdefault(parts[0], set()).add(parts[1])
-            else:
-                top_include.add(field)
-    
-    top_exclude = set()
-    nested_exclude = {}
-    if exclude is not None:
-        for field in exclude:
-            if '.' in field:
-                parts = field.split('.', 1)
-                nested_exclude.setdefault(parts[0], set()).add(parts[1])
-            else:
-                top_exclude.add(field)
-    
+    if data.get('_is_tuple') or data.get('_is_set'):
+        return {**data, 'items': _apply_field_filter(data['items'], include, exclude)}
+    selection = _FieldSelection(include, exclude)
     result = {}
     for key, value in data.items():
-        # Always keep _serialized_type
-        if key == '_serialized_type':
+        if key == SERIALIZED_TYPE_ATTRIBUTE_NAME:
             result[key] = value
             continue
-        
-        # Check top-level filtering
-        if include is not None:
-            # If include is specified, only include fields in top_include or nested_include
-            if key not in top_include and key not in nested_include:
-                continue
-        if exclude is not None and key in top_exclude:
-            continue
-        
-        # Apply nested filtering recursively
-        if key in nested_include:
-            if isinstance(value, dict):
-                # Check if it's a set or tuple structure
-                if value.get('_is_set') or value.get('_is_tuple'):
-                    result[key] = dict(value)  # Copy structure
-                    if 'items' in value:
-                        result[key]['items'] = [_apply_field_filter(item, include=nested_include[key], exclude=None) if isinstance(item, dict) else item for item in value['items']]
-                else:
-                    result[key] = _apply_field_filter(value, include=nested_include[key], exclude=None)
-            elif isinstance(value, list):
-                result[key] = [_apply_field_filter(item, include=nested_include[key], exclude=None) if isinstance(item, dict) else item for item in value]
-            else:
-                result[key] = value
-        elif key in nested_exclude:
-            if isinstance(value, dict):
-                # Check if it's a set or tuple structure
-                if value.get('_is_set') or value.get('_is_tuple'):
-                    result[key] = dict(value)  # Copy structure
-                    if 'items' in value:
-                        result[key]['items'] = [_apply_field_filter(item, include=None, exclude=nested_exclude[key]) if isinstance(item, dict) else item for item in value['items']]
-                else:
-                    result[key] = _apply_field_filter(value, include=None, exclude=nested_exclude[key])
-            elif isinstance(value, list):
-                result[key] = [_apply_field_filter(item, include=None, exclude=nested_exclude[key]) if isinstance(item, dict) else item for item in value]
-            else:
-                result[key] = value
-        else:
-            result[key] = value
-    
+        child = selection.child(key)
+        if child is not None:
+            result[key] = _apply_field_filter(value, child.include, child.exclude)
     return result
-    return json_str if string_output else json.loads(json_str)
 
 
 def _handle_serialization_error(func, path):
@@ -252,13 +245,13 @@ def _preprocess_for_serialization(obj, serialize_private_attributes=False, path=
             f"{path}[{i}]" if path else f"[{i}]"
         ) for i, item in enumerate(obj)]
     
-    # Handle dicts
+    # A dictionary's private-looking keys are ordinary user data.
     if isinstance(obj, dict):
-        return {k: _handle_serialization_error(
-            lambda v=v, k=k: _preprocess_for_serialization(v, serialize_private_attributes, f"{path}.{k}" if path else k),
-            f"{path}.{k}" if path else k
-        ) for k, v in obj.items()}
-    
+        result = _serialize_fields(obj, obj.__getitem__, serialize_private_attributes, path, filter_private=False)
+        if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj:
+            result[SERIALIZED_TYPE_ATTRIBUTE_NAME] = obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
+        return result
+
     # Handle all other objects (tuples, sets, enums, custom objects)
     return _serialize_object(obj, serialize_private_attributes, path)
 
@@ -380,21 +373,13 @@ def _serialize_object(obj, serialize_private_attributes=False, path=""):
     
     # Check for Pydantic model first (before other checks)
     if is_pydantic_model(obj):
-        # Get the dict from Pydantic
-        pydantic_dict = serialize_pydantic_model(obj, serialize_private_attributes)
-        # Recursively process the dict to handle sets, tuples, nested objects
-        result = {}
-        for key, value in pydantic_dict.items():
-            if key == '_serialized_type':
-                result[key] = value
-            else:
-                key_path = f"{path}.{key}" if path else key
-                result[key] = _handle_serialization_error(
-                    lambda v=value, kp=key_path: _preprocess_for_serialization(v, serialize_private_attributes, kp),
-                    key_path
-                )
+        selection = _selection.get() or _FieldSelection()
+        pydantic_dict = serialize_pydantic_model(obj, serialize_private_attributes,
+                                                 selection.include, selection.exclude)
+        result = _serialize_fields(pydantic_dict, pydantic_dict.__getitem__, serialize_private_attributes, path, filter_private=False)
+        result[SERIALIZED_TYPE_ATTRIBUTE_NAME] = full_type_name(typ)
         return result
-    
+
     # Check if it's an Enum
     if isinstance(obj, Enum):
         return {
@@ -407,6 +392,9 @@ def _serialize_object(obj, serialize_private_attributes=False, path=""):
     if typ in _JsonicSerializer.serializers:
         value = dict(_JsonicSerializer.serializers[typ](obj))
         value[SERIALIZED_TYPE_ATTRIBUTE_NAME] = typ.__name__
+        selection = _selection.get() or _FieldSelection()
+        if typ not in (tuple, set) and (selection.include is not None or selection.exclude):
+            value = _apply_field_filter(value, selection.include, selection.exclude)
         return value
 
     # Priority 2: Serializable types (100)
@@ -421,41 +409,13 @@ def _serialize_object(obj, serialize_private_attributes=False, path=""):
         has_dict = hasattr(obj, '__dict__') and len(obj.__dict__) > 0
         has_slots = hasattr(obj, '__slots__')
         
-        if has_dict:
-            result = {SERIALIZED_TYPE_ATTRIBUTE_NAME: type_name}
-            for key, value in list(vars(obj).items()):
-                if key == SERIALIZED_TYPE_ATTRIBUTE_NAME:
-                    continue
-                if not serialize_private_attributes and key.startswith('_'):
-                    continue
-                if key in type_data.transient_attributes:
-                    continue
-                key_path = f"{path}.{key}" if path else key
-                result[key] = _handle_serialization_error(
-                    lambda v=value, kp=key_path: _preprocess_for_serialization(v, serialize_private_attributes, kp),
-                    key_path
-                )
+        if has_dict or has_slots:
+            names = list(vars(obj)) if has_dict else [name for name in _get_all_slots(typ) if hasattr(obj, name)]
+            result = _serialize_fields(names, lambda key: getattr(obj, key),
+                                       serialize_private_attributes, path, type_data.transient_attributes)
+            result[SERIALIZED_TYPE_ATTRIBUTE_NAME] = type_name
             return result
-        elif has_slots:
-            # Handle __slots__ for Serializable
-            result = {SERIALIZED_TYPE_ATTRIBUTE_NAME: type_name}
-            slots = _get_all_slots(typ)
-            for slot in slots:
-                if hasattr(obj, slot):
-                    # Skip private and transient attributes
-                    if not serialize_private_attributes and slot.startswith('_'):
-                        continue
-                    if type_data.transient_attributes and slot in type_data.transient_attributes:
-                        continue
-                    
-                    value = getattr(obj, slot)
-                    slot_path = f"{path}.{slot}" if path else slot
-                    result[slot] = _handle_serialization_error(
-                        lambda v=value, sp=slot_path: _preprocess_for_serialization(v, serialize_private_attributes, sp),
-                        slot_path
-                    )
-            return result
-    
+
     # Priority 3: Type resolvers (dataclass=50, typehinted=25)
     from jsonic.type_resolver import get_resolver_for_type
     resolver = get_resolver_for_type(typ)
@@ -466,38 +426,16 @@ def _serialize_object(obj, serialize_private_attributes=False, path=""):
         )
         result = dict(result)
         result[SERIALIZED_TYPE_ATTRIBUTE_NAME] = type_name
+        selection = _selection.get() or _FieldSelection()
+        if selection.include is not None or selection.exclude:
+            result = _apply_field_filter(result, selection.include, selection.exclude)
         return result
     
-    # Fallback: Generic object with __dict__ or __slots__
-    if hasattr(obj, '__dict__'):
-        result = {SERIALIZED_TYPE_ATTRIBUTE_NAME: type_name}
-        for key, value in list(vars(obj).items()):
-            if key == SERIALIZED_TYPE_ATTRIBUTE_NAME:
-                continue
-            # Skip private attributes if requested (but not _serialized_type)
-            if not serialize_private_attributes and key.startswith('_') and key != SERIALIZED_TYPE_ATTRIBUTE_NAME:
-                continue
-            key_path = f"{path}.{key}" if path else key
-            result[key] = _handle_serialization_error(
-                lambda v=value, kp=key_path: _preprocess_for_serialization(v, serialize_private_attributes, kp),
-                key_path
-            )
-        return result
-    elif hasattr(obj, '__slots__'):
-        # Handle __slots__ classes
-        result = {SERIALIZED_TYPE_ATTRIBUTE_NAME: type_name}
-        slots = _get_all_slots(typ)
-        for slot in slots:
-            if hasattr(obj, slot):
-                # Skip private attributes if requested
-                if not serialize_private_attributes and slot.startswith('_'):
-                    continue
-                value = getattr(obj, slot)
-                slot_path = f"{path}.{slot}" if path else slot
-                result[slot] = _handle_serialization_error(
-                    lambda v=value, sp=slot_path: _preprocess_for_serialization(v, serialize_private_attributes, sp),
-                    slot_path
-                )
+    # Fallback: Generic object with __dict__ or __slots__.
+    if hasattr(obj, '__dict__') or hasattr(obj, '__slots__'):
+        names = list(vars(obj)) if hasattr(obj, '__dict__') else [name for name in _get_all_slots(typ) if hasattr(obj, name)]
+        result = _serialize_fields(names, lambda key: getattr(obj, key), serialize_private_attributes, path)
+        result[SERIALIZED_TYPE_ATTRIBUTE_NAME] = type_name
         return result
 
     raise SerializationError(f'Could not find serializer for type: {typ}', path)
