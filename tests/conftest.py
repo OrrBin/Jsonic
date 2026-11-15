@@ -11,12 +11,18 @@ def reset_global_state():
     original_types = Serializable.jsonic_types.copy()
     original_serializers = _JsonicSerializer.serializers.copy()
     original_deserializers = _JsonicDeserializer.deserializers.copy()
+    original_codec_types = _JsonicDeserializer.types.copy()
+    original_type_ids = _JsonicSerializer.type_ids.copy()
+    original_encoder_types = _JsonicSerializer.types.copy()
     
     yield
     
     Serializable.jsonic_types = original_types
     _JsonicSerializer.serializers = original_serializers
     _JsonicDeserializer.deserializers = original_deserializers
+    _JsonicDeserializer.types = original_codec_types
+    _JsonicSerializer.type_ids = original_type_ids
+    _JsonicSerializer.types = original_encoder_types
 
 
 @pytest.fixture
