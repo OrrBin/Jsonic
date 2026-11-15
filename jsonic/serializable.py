@@ -1,6 +1,7 @@
 import importlib
 import inspect
 import json
+from contextvars import ContextVar
 from enum import Enum
 from typing import List, Dict
 
@@ -15,6 +16,9 @@ from jsonic.pydantic_support import (
 )
 
 SERIALIZED_TYPE_ATTRIBUTE_NAME = '_serialized_type'
+
+# A call-local policy also reaches legacy callbacks that recursively call deserialize.
+_safe_types = ContextVar('jsonic_safe_types', default=None)
 
 
 class EnumEncoder(json.JSONEncoder):
@@ -259,7 +263,63 @@ def _preprocess_for_serialization(obj, serialize_private_attributes=False, path=
     return _serialize_object(obj, serialize_private_attributes, path)
 
 
-def deserialize(obj, deserialize_private_attributes: bool = False, string_input: bool = False, expected_type: type = None, _path: str = ""):
+def _validate_safe_payload(obj, allowed, path=""):
+    """Validate the entire tree before executing any reconstruction callbacks."""
+    if isinstance(obj, list):
+        for i, value in enumerate(obj):
+            _validate_safe_payload(value, allowed, f"{path}[{i}]")
+    elif isinstance(obj, dict):
+        tag = obj.get(SERIALIZED_TYPE_ATTRIBUTE_NAME)
+        if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj:
+            if not isinstance(tag, str) or tag not in allowed:
+                raise DeserializationError(f"Type tag is not registered for safe decoding: {tag!r}", path)
+        for marker, name in (("_is_tuple", "tuple"), ("_is_set", "set")):
+            if obj.get(marker):
+                if tag != name or obj[marker] is not True or not isinstance(obj.get("items"), list):
+                    raise DeserializationError(f"Invalid {name} envelope", path)
+        for key, value in obj.items():
+            _validate_safe_payload(value, allowed, f"{path}.{key}" if path else str(key))
+
+
+def deserialize(obj, deserialize_private_attributes=False, string_input=False,
+                expected_type=None, _path="", *, safe=None):
+    """Decode Jsonic data.
+
+    Pass safe=True for externally controlled data. Only registered classes and
+    codecs (plus an explicitly supplied root expected_type) are authorized.
+    The policy propagates through nested callbacks. Registration authorizes
+    trusted application code; it does not sandbox constructors or hooks.
+    The default retains legacy dynamic imports for backward compatibility.
+    """
+    policy = _safe_types.get()
+    token = None
+    if safe is True and policy is None:
+        allowed = {name: data.cls for name, data in Serializable.jsonic_types.items()}
+        allowed.update({name: None for name in _JsonicDeserializer.deserializers})
+        if expected_type is not None:
+            allowed[full_type_name(expected_type)] = expected_type
+        token = _safe_types.set(allowed)
+        policy = allowed
+    try:
+        if policy is not None:
+            if string_input:
+                if not isinstance(obj, str):
+                    raise TypeError("string_input requires str")
+                obj = json.loads(obj)
+                string_input = False
+            _validate_safe_payload(obj, policy, _path)
+            # Compare metadata before even looking up the selected class.
+            if expected_type is not None and isinstance(obj, dict) and SERIALIZED_TYPE_ATTRIBUTE_NAME in obj:
+                tag = obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
+                if tag not in (full_type_name(expected_type), expected_type.__name__):
+                    raise DeserializationError(f"Type tag does not match expected type: {expected_type}", _path)
+        return _deserialize_impl(obj, deserialize_private_attributes, string_input, expected_type, _path)
+    finally:
+        if token is not None:
+            _safe_types.reset(token)
+
+
+def _deserialize_impl(obj, deserialize_private_attributes: bool = False, string_input: bool = False, expected_type: type = None, _path: str = ""):
     """
     Deserializes dictionary/json string representing dictionary, that was returned by ``serialize`` function call on an object
 
@@ -551,6 +611,12 @@ def _find_similar_types(type_name: str, max_suggestions: int = 5):
 
 
 def get_type_by_name(type_name: str):
+    policy = _safe_types.get()
+    if policy is not None:
+        cls = policy.get(type_name)
+        if cls is None:
+            raise DeserializationError(f"Type tag is not registered for safe decoding: {type_name!r}")
+        return cls
     if type_name in Serializable.jsonic_types:
         return Serializable.jsonic_types[type_name].cls
 
@@ -611,10 +677,9 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
 
     type_name = obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
     is_jsonic_type = type_name in Serializable.jsonic_types
-    cls = get_type_by_name(type_name)
-
     if expected_type and full_type_name(expected_type) != type_name:
         raise DeserializationError(f'Deserializing type {type_name}, which is not the expected type: {expected_type}', path)
+    cls = get_type_by_name(type_name)
 
     # Check if it's a Pydantic model
     if is_pydantic_class(cls):
