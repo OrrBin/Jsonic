@@ -1,5 +1,12 @@
 # Unreleased
 
+## F06 — combined enum flags (#8)
+
+`Flag` and `IntFlag` reconstruct from their stored numeric value, preserving
+combined and zero values. Ordinary enums continue to use named members.
+Unknown bits follow the enum class's own boundary policy. Malformed enum data
+raises `DeserializationError` with the original cause. The wire format is unchanged.
+
 ## F05 — preserve decoding input (#7)
 
 Custom decoders receive a separate outer dictionary without the type tag.
