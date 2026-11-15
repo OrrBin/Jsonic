@@ -1,5 +1,19 @@
 # Unreleased
 
+## F03 — traversal-time field selection (#5)
+
+Field selection now runs before reading/traversing built-in object fields.
+Root lists, tuples and sets apply selectors to each member, including nested
+collections. Excluded unsupported values, cycles and child hooks are skipped.
+Pydantic receives native include/exclude rules before dumping fields.
+
+Exclusion wins at every nesting level, preserving existing top-level behavior
+and correcting the previous include-wins documentation. This changes nested
+overlaps that previously ignored exclusions; review redaction output when
+upgrading. Dots denote path separators; there is no escaping for literal keys
+containing dots. Custom codecs still control their own extraction and recursion;
+their output is filtered, but Jsonic cannot prevent work inside user callbacks.
+
 ## F02 — non-mutating serialization (#4)
 
 Serialization reads a separate attribute mapping and writes metadata only to

@@ -15,17 +15,10 @@ class DataclassResolver(TypeResolver):
     
     def serialize(self, obj: Any, serialize_private_attributes: bool = True) -> Dict[str, Any]:
         """Serialize a dataclass instance, handling enums, tuples, and sets specially."""
-        from jsonic.serializable import _preprocess_for_serialization
-        result = {}
-        for field in dataclasses.fields(obj):
-            # Skip private fields if requested
-            if not serialize_private_attributes and field.name.startswith('_'):
-                continue
-            value = getattr(obj, field.name)
-            # Recursively serialize all values
-            result[field.name] = _preprocess_for_serialization(value, serialize_private_attributes, field.name)
-        return result
-    
+        from jsonic.serializable import _serialize_fields
+        return _serialize_fields([field.name for field in dataclasses.fields(obj)],
+                                 lambda key: getattr(obj, key), serialize_private_attributes)
+
     def deserialize(self, data: Dict[str, Any], cls: Type) -> Any:
         """Deserialize data into a dataclass instance."""
         # Get field names and types

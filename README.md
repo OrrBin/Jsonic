@@ -15,6 +15,12 @@ The backward-compatible default `deserialize(payload)` permits dynamic module
 imports and constructors selected by the payload. Use it only for trusted data.
 Safe mode does not provide field validation or resource limits.
 
+Field selectors apply to each member of root and nested collections. Exclusion
+wins if `include` and `exclude` overlap, at every nesting level. Excluded fields
+are skipped before built-in traversal. Selectors use dots as path separators;
+literal dotted keys have no escape syntax. Custom codecs control their own
+extraction, so filtering cannot prevent work performed inside those callbacks.
+
 [![PyPI version](https://badge.fury.io/py/py-jsonic.svg)](https://badge.fury.io/py/py-jsonic)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)

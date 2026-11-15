@@ -51,7 +51,38 @@ def is_pydantic_class(cls: Type) -> bool:
         return False
 
 
-def serialize_pydantic_model(obj: Any, serialize_private_attributes: bool = False) -> dict:
+def _dump_selector(obj, paths):
+    """Translate wire-name dotted selectors to Pydantic's native selectors."""
+    if paths is None:
+        return None
+    from jsonic.serializable import _FieldSelection
+    if isinstance(obj, (list, tuple)):
+        return {i: _dump_selector(value, paths) for i, value in enumerate(obj)}
+    if isinstance(obj, set):
+        # Pydantic's set selectors apply uniformly to members.
+        return {'__all__': _dump_selector(next(iter(obj)), paths)} if obj else {}
+    groups = _FieldSelection._split(paths)
+    if is_pydantic_model(obj):
+        fields = type(obj).model_fields if PYDANTIC_V2 else obj.__fields__
+        names = {getattr(field, 'serialization_alias', None) or field.alias or name: name
+                 for name, field in fields.items()}
+        getter = lambda key: getattr(obj, key)
+    elif isinstance(obj, dict):
+        names = {name: name for name in obj}
+        getter = obj.__getitem__
+    else:
+        return {key: True if '' in tails else _dump_selector(None, tails)
+                for key, tails in groups.items()}
+    result = {}
+    for wire_name, tails in groups.items():
+        if wire_name in names:
+            name = names[wire_name]
+            result[name] = True if '' in tails else _dump_selector(getter(name), tails)
+    return result
+
+
+def serialize_pydantic_model(obj: Any, serialize_private_attributes: bool = False,
+                             include=None, exclude=None) -> dict:
     """
     Serialize a Pydantic model to a dictionary.
     
@@ -74,10 +105,12 @@ def serialize_pydantic_model(obj: Any, serialize_private_attributes: bool = Fals
     # Use appropriate method based on Pydantic version
     if PYDANTIC_V2:
         # Pydantic V2: use model_dump with mode='python' and by_alias=True
-        data = obj.model_dump(mode='python', exclude_none=False, by_alias=True)
+        data = obj.model_dump(mode='python', exclude_none=False, by_alias=True,
+                              include=_dump_selector(obj, include), exclude=_dump_selector(obj, exclude))
     else:
         # Pydantic V1: use dict() with by_alias=True
-        data = obj.dict(exclude_none=False, by_alias=True)
+        data = obj.dict(exclude_none=False, by_alias=True,
+                        include=_dump_selector(obj, include), exclude=_dump_selector(obj, exclude))
     
     # Add Jsonic type marker for deserialization
     data['_serialized_type'] = f"{obj.__class__.__module__}.{obj.__class__.__name__}"

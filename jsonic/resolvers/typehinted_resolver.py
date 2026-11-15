@@ -22,30 +22,10 @@ class TypeHintedResolver(TypeResolver):
     
     def serialize(self, obj: Any, serialize_private_attributes: bool = True) -> Dict[str, Any]:
         """Serialize object by extracting __dict__ or __slots__, handling tuples and sets."""
-        from jsonic.serializable import _preprocess_for_serialization, _get_all_slots
-        result = {}
-        
-        # Handle both __dict__ and __slots__
-        if hasattr(obj, '__dict__') and len(obj.__dict__) > 0:
-            for key, value in obj.__dict__.items():
-                # Skip private attributes if requested
-                if not serialize_private_attributes and key.startswith('_'):
-                    continue
-                # Recursively serialize all values
-                result[key] = _preprocess_for_serialization(value, serialize_private_attributes, key)
-        elif hasattr(obj, '__slots__'):
-            slots = _get_all_slots(type(obj))
-            for slot in slots:
-                if hasattr(obj, slot):
-                    # Skip private attributes if requested
-                    if not serialize_private_attributes and slot.startswith('_'):
-                        continue
-                    value = getattr(obj, slot)
-                    # Recursively serialize all values
-                    result[slot] = _preprocess_for_serialization(value, serialize_private_attributes, slot)
-        
-        return result
-    
+        from jsonic.serializable import _serialize_fields, _get_all_slots
+        names = list(vars(obj)) if hasattr(obj, '__dict__') and vars(obj) else [name for name in _get_all_slots(type(obj)) if hasattr(obj, name)]
+        return _serialize_fields(names, lambda key: getattr(obj, key), serialize_private_attributes)
+
     def deserialize(self, data: Dict[str, Any], cls: Type) -> Any:
         """Deserialize data using type hints from __init__."""
         sig = inspect.signature(cls.__init__)
