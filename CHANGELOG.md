@@ -1,5 +1,18 @@
 # Unreleased
 
+## F13 — complete adapter error paths (#15)
+
+Dataclass/type-hinted extraction, registered/resolver reconstruction, Pydantic
+child traversal and tuple/set adapters retain complete parent paths. Normalized
+TypeError/AttributeError failures chain their original cause. Jsonic errors add
+code, expected_type, actual_type and field metadata without removing existing
+exception inheritance. Input values are not included in root type/input errors.
+Specialized TypeError/AttributeError subclasses, native ValueError subclasses
+(including Pydantic ValidationError), KeyError and
+application RuntimeError remain catch-compatible; their own messages/locations
+are not rewritten. User callback error text is preserved and may contain values
+chosen by that callback. The wire format is unchanged.
+
 ## F08 — tuple/set traversal context (#10)
 
 Built-in tuple/set adapters preserve private-field options and parent paths in

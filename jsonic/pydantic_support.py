@@ -138,31 +138,11 @@ def deserialize_pydantic_model(data: dict, cls: Type) -> Any:
     Raises:
         ValidationError: If data doesn't match Pydantic model schema
     """
-    # Import here to avoid circular dependency
-    from jsonic.serializable import deserialize, SERIALIZED_TYPE_ATTRIBUTE_NAME
-    
-    def _deserialize_value(v):
-        """Recursively deserialize a value."""
-        if isinstance(v, dict):
-            # Check if it's a Jsonic-serialized structure
-            if v.get('_is_set') or v.get('_is_tuple') or SERIALIZED_TYPE_ATTRIBUTE_NAME in v:
-                return deserialize(v)
-            else:
-                # Regular dict, recursively process its values
-                return {k: _deserialize_value(nested_v) for k, nested_v in v.items()}
-        elif isinstance(v, list):
-            # Recursively deserialize list items
-            return [_deserialize_value(item) for item in v]
-        else:
-            return v
-    
-    # Remove Jsonic metadata and recursively deserialize nested structures
-    clean_data = {}
-    for k, v in data.items():
-        if k == '_serialized_type':
-            continue
-        clean_data[k] = _deserialize_value(v)
-    
+    from jsonic.context import current_context
+    context = current_context()
+    clean_data = {key: context.deserialize(value, key) for key, value in data.items()
+                  if key != '_serialized_type'}
+
     # Use appropriate method based on Pydantic version
     if PYDANTIC_V2:
         # Pydantic V2: use model_validate
