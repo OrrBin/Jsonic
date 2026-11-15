@@ -1,5 +1,21 @@
 # Unreleased
 
+## F04 — expected types and codec identity (#6)
+
+Root `expected_type` now uses exact Python type identity on every decode path,
+including primitives, tuples, sets, enums and custom codecs. `bool` does not
+satisfy `int`; subclass acceptance, unions and field validation are not implied.
+Type mismatches are rejected before imports or callbacks when identifiable
+from the payload; decoder return types are also checked. Previously tolerated
+mismatches now raise `DeserializationError`.
+
+Custom decorators accept an optional stable `type_id`; deserializers also
+accept explicit `aliases`. Encoder/decoder pairs must use the same ID.
+Existing writers retain their short tags, while readers also accept qualified
+IDs. Ambiguous decoder tags are rejected instead of overwriting a different
+type. Use explicit unique IDs for same-name classes. These additions do not
+change the default output format; old readers cannot read newly opted-in IDs.
+
 ## F03 — traversal-time field selection (#5)
 
 Field selection now runs before reading/traversing built-in object fields.

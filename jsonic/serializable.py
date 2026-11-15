@@ -274,6 +274,33 @@ def _validate_safe_payload(obj, allowed, path=""):
             _validate_safe_payload(value, allowed, f"{path}.{key}" if path else str(key))
 
 
+def _check_expected_type(actual, expected, path):
+    if actual is not expected:
+        raise DeserializationError(f"Deserializing type {actual}, which is not the expected type: {expected}", path)
+
+
+def _payload_type(obj, expected):
+    """Identify a root type without input-directed imports or callback execution."""
+    if not isinstance(obj, dict):
+        return type(obj)
+    if obj.get('_is_tuple'):
+        return tuple
+    if obj.get('_is_set'):
+        return set
+    tag = obj.get(SERIALIZED_TYPE_ATTRIBUTE_NAME)
+    if tag is None:
+        return dict
+    if not isinstance(tag, str):
+        raise DeserializationError("Type tag must be a string")
+    if tag in _JsonicDeserializer.types:
+        return _JsonicDeserializer.types[tag]
+    if tag in Serializable.jsonic_types:
+        return Serializable.jsonic_types[tag].cls
+    # Identity cannot be resolved safely from a module name. Compare the name
+    # now, then verify the actual constructed type after legacy dispatch.
+    return expected if tag == full_type_name(expected) else None
+
+
 def deserialize(obj, deserialize_private_attributes=False, string_input=False,
                 expected_type=None, _path="", *, safe=None):
     """Decode Jsonic data.
@@ -288,7 +315,7 @@ def deserialize(obj, deserialize_private_attributes=False, string_input=False,
     token = None
     if safe is True and policy is None:
         allowed = {name: data.cls for name, data in Serializable.jsonic_types.items()}
-        allowed.update({name: None for name in _JsonicDeserializer.deserializers})
+        allowed.update(_JsonicDeserializer.types)
         if expected_type is not None:
             allowed[full_type_name(expected_type)] = expected_type
         token = _safe_types.set(allowed)
@@ -301,12 +328,16 @@ def deserialize(obj, deserialize_private_attributes=False, string_input=False,
                 obj = json.loads(obj)
                 string_input = False
             _validate_safe_payload(obj, policy, _path)
-            # Compare metadata before even looking up the selected class.
-            if expected_type is not None and isinstance(obj, dict) and SERIALIZED_TYPE_ATTRIBUTE_NAME in obj:
-                tag = obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
-                if tag not in (full_type_name(expected_type), expected_type.__name__):
-                    raise DeserializationError(f"Type tag does not match expected type: {expected_type}", _path)
-        return _deserialize_impl(obj, deserialize_private_attributes, string_input, expected_type, _path)
+        if expected_type is not None:
+            if not isinstance(expected_type, type):
+                raise TypeError("expected_type must be a concrete Python type")
+            source = json.loads(obj) if string_input and isinstance(obj, str) else obj
+            actual = _payload_type(source, expected_type)
+            _check_expected_type(actual, expected_type, _path)
+        result = _deserialize_impl(obj, deserialize_private_attributes, string_input, expected_type, _path)
+        if expected_type is not None:
+            _check_expected_type(type(result), expected_type, _path)
+        return result
     finally:
         if token is not None:
             _safe_types.reset(token)
@@ -391,7 +422,7 @@ def _serialize_object(obj, serialize_private_attributes=False, path=""):
     # Priority 1: Custom serializers (100)
     if typ in _JsonicSerializer.serializers:
         value = dict(_JsonicSerializer.serializers[typ](obj))
-        value[SERIALIZED_TYPE_ATTRIBUTE_NAME] = typ.__name__
+        value[SERIALIZED_TYPE_ATTRIBUTE_NAME] = _JsonicSerializer.type_ids.get(typ, typ.__name__)
         selection = _selection.get() or _FieldSelection()
         if typ not in (tuple, set) and (selection.include is not None or selection.exclude):
             value = _apply_field_filter(value, selection.include, selection.exclude)
@@ -458,8 +489,6 @@ def _get_all_slots(cls):
 def _deserialize_with_custom_deserializer(obj, expected_type: type = None, path=""):
     if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj:
         type_name = obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
-        if expected_type and full_type_name(expected_type) != type_name:
-            raise DeserializationError(f'Deserializing type {type_name}, which is not the expected type: {expected_type}', path)
         if type_name in _JsonicDeserializer.deserializers:
             del obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
             result = _JsonicDeserializer.deserializers[type_name](obj)
