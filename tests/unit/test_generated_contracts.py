@@ -80,7 +80,7 @@ def test_root_adapter_safe_decoding_authorized_by_expected_type(adapter):
     assert deserialize(serialize(cls(7)), expected_type=cls, safe=True).value == 7
 
 
-@pytest.mark.parametrize('adapter', ['generic', 'hinted', 'dataclass', 'slots', 'registered', 'resolver'])
+@pytest.mark.parametrize('adapter', ['generic', 'hinted', 'dataclass', 'slots', 'registered', 'codec', 'resolver'])
 @pytest.mark.parametrize('shape', sorted(WRAPPERS))
 def test_selection_precedence_matches_simple_reference_rule(adapter, shape):
     cls = prepare_adapter(adapter)
@@ -121,6 +121,14 @@ def test_repeated_references_do_not_imply_graph_identity_preservation():
     restored = deserialize(serialize([shared, shared]), safe=True)
     assert restored == [shared, shared]
     assert restored[0] is not restored[1]
+
+
+@pytest.mark.parametrize('source,normalized', [({1: 'v'}, {'1': 'v'}),
+                                             ({None: 'v'}, {'null': 'v'}),
+                                             ({True: 'v'}, {'true': 'v'})])
+def test_supported_nonstring_dictionary_keys_follow_json_normalization(source, normalized):
+    assert deserialize(serialize(source), safe=True) == normalized
+    assert len(source) == 1
 
 
 def test_excluded_cycle_does_not_break_independent_shared_values():

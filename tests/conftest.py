@@ -1,11 +1,24 @@
 """Shared fixtures and configuration for all tests"""
 import pytest
+import random
 
 from jsonic import Serializable
 from jsonic.decorators import _JsonicSerializer, _JsonicDeserializer
 from jsonic.type_resolver import _registry
 
 pytest_plugins = ('pytester',)
+
+
+def pytest_addoption(parser):
+    parser.addoption('--wheel-path', default=None, help='Prebuilt wheel for isolated installed-package tests')
+    parser.addoption('--legacy-jsonic-root', default=None, help='Historical checkout for old-reader compatibility tests')
+    parser.addoption('--test-order-seed', type=int, default=None, help='Reproducibly shuffle collected cases to check state isolation')
+
+
+def pytest_collection_modifyitems(config, items):
+    seed = config.getoption('--test-order-seed')
+    if seed is not None:
+        random.Random(seed).shuffle(items)
 
 
 @pytest.fixture(autouse=True)

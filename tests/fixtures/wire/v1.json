@@ -1,0 +1,24 @@
+{
+  "provenance": {
+    "fixture_models_version": 1,
+    "implementation_commit": "a959d7e9f048d6e2bb9c0692d4eceee3df6ed632",
+    "description": "Wire contracts verified against this implementation with the importable fixture models introduced in #30. Not a claim about published PyPI artifacts. Set fixture uses one item to avoid ordering assumptions."
+  },
+  "cases": {
+    "primitives": {"items": [1, true, null, "日本語"]},
+    "tuple": {"items": [1, "x"], "_is_tuple": true, "_serialized_type": "tuple"},
+    "set": {"items": [7], "_is_set": true, "_serialized_type": "set"},
+    "datetime": {"datetime": "2026-11-15 12:34:56.123456+00:00", "_serialized_type": "datetime"},
+    "complex": {"value": "complex(-3.0,4.0)", "_serialized_type": "complex"},
+    "record": {"value": 7, "_serialized_type": "tests.support.persistence_models.Record"},
+    "color": {"name": "RED", "value": "red", "_serialized_type": "tests.support.persistence_models.Color"},
+    "flags": {"name": "READ", "value": 1, "_serialized_type": "tests.support.persistence_models.Permission"},
+    "stable": {"value": 7, "_serialized_type": "testing:persist:v1"},
+    "alias": {"value": 7, "_serialized_type": "OldValue"},
+    "moved": {"value": 7, "_serialized_type": "testing:persist:v1"}
+  },
+  "historical_variants": {
+    "combined_flags_python38": {"name": null, "value": 3, "_serialized_type": "tests.support.persistence_models.Permission"},
+    "combined_flags_python312": {"name": "READ|WRITE", "value": 3, "_serialized_type": "tests.support.persistence_models.Permission"}
+  }
+}
