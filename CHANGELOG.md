@@ -1,5 +1,13 @@
 # Unreleased
 
+## F02 — non-mutating serialization (#4)
+
+Serialization reads a separate attribute mapping and writes metadata only to
+the output. Private/transient fields remain present during traversal and after
+errors. Custom serializer and resolver result mappings are copied before tags
+are added. The wire format is unchanged. Applications must not rely on the
+previous undocumented injection of `_serialized_type` onto source instances.
+
 ## F01 — controlled decoding (#3)
 
 `deserialize(..., safe=True)` preflights all nested tags before imports,

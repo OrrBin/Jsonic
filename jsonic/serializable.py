@@ -405,7 +405,7 @@ def _serialize_object(obj, serialize_private_attributes=False, path=""):
     
     # Priority 1: Custom serializers (100)
     if typ in _JsonicSerializer.serializers:
-        value = _JsonicSerializer.serializers[typ](obj)
+        value = dict(_JsonicSerializer.serializers[typ](obj))
         value[SERIALIZED_TYPE_ATTRIBUTE_NAME] = typ.__name__
         return value
 
@@ -415,7 +415,6 @@ def _serialize_object(obj, serialize_private_attributes=False, path=""):
     
     if is_jsonic_type:
         type_data = Serializable.jsonic_types[type_name]
-        ignored_attributes = {}
         
         # Handle both __dict__ and __slots__
         # If __dict__ exists but is empty and __slots__ exists, use __slots__
@@ -423,29 +422,19 @@ def _serialize_object(obj, serialize_private_attributes=False, path=""):
         has_slots = hasattr(obj, '__slots__')
         
         if has_dict:
-            if not serialize_private_attributes:  # Do not serialize private attributes
-                to_remove = [key for key in obj.__dict__.keys() if key.startswith('_')]
-                for key in to_remove:
-                    ignored_attributes[key] = getattr(obj, key)
-                    delattr(obj, key)
-
-            if type_data.transient_attributes:  # Do not serialize transient attributes
-                to_remove = [key for key in obj.__dict__.keys() if key in type_data.transient_attributes]
-                for key in to_remove:
-                    ignored_attributes[key] = getattr(obj, key)
-                    delattr(obj, key)
-
-            setattr(obj, SERIALIZED_TYPE_ATTRIBUTE_NAME, type_name)
-            result = {}
-            for key, value in obj.__dict__.items():
+            result = {SERIALIZED_TYPE_ATTRIBUTE_NAME: type_name}
+            for key, value in list(vars(obj).items()):
+                if key == SERIALIZED_TYPE_ATTRIBUTE_NAME:
+                    continue
+                if not serialize_private_attributes and key.startswith('_'):
+                    continue
+                if key in type_data.transient_attributes:
+                    continue
                 key_path = f"{path}.{key}" if path else key
                 result[key] = _handle_serialization_error(
                     lambda v=value, kp=key_path: _preprocess_for_serialization(v, serialize_private_attributes, kp),
                     key_path
                 )
-            for key, val in ignored_attributes.items():
-                setattr(obj, key, val)
-
             return result
         elif has_slots:
             # Handle __slots__ for Serializable
@@ -475,14 +464,16 @@ def _serialize_object(obj, serialize_private_attributes=False, path=""):
             lambda: resolver.serialize(obj, serialize_private_attributes),
             path
         )
+        result = dict(result)
         result[SERIALIZED_TYPE_ATTRIBUTE_NAME] = type_name
         return result
     
     # Fallback: Generic object with __dict__ or __slots__
     if hasattr(obj, '__dict__'):
-        setattr(obj, SERIALIZED_TYPE_ATTRIBUTE_NAME, type_name)
-        result = {}
-        for key, value in obj.__dict__.items():
+        result = {SERIALIZED_TYPE_ATTRIBUTE_NAME: type_name}
+        for key, value in list(vars(obj).items()):
+            if key == SERIALIZED_TYPE_ATTRIBUTE_NAME:
+                continue
             # Skip private attributes if requested (but not _serialized_type)
             if not serialize_private_attributes and key.startswith('_') and key != SERIALIZED_TYPE_ATTRIBUTE_NAME:
                 continue
