@@ -276,9 +276,10 @@ class TestMalformedData:
             name: str
             age: int
         
-        malformed = {"name": "Alice", "_serialized_type": "__main__.Required"}
+        from jsonic.util import full_type_name
+        malformed = {"name": "Alice", "_serialized_type": full_type_name(Required)}
         
-        with pytest.raises((AttributeError, TypeError)):
+        with pytest.raises(TypeError, match="age"):
             deserialize(malformed, expected_type=Required)
     
     def test_wrong_type_in_serialized_data(self):

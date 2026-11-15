@@ -340,10 +340,8 @@ class TestComplexTypeHints:
         result2 = deserialize(serialize(data2), expected_type=Data)
         assert result2.tags is None
     
-    def test_dict_with_tuple_keys_and_set_values(self):
-        """Dict with tuple keys and set values."""
-        # Note: JSON doesn't support tuple keys, so this will fail
-        # But we can test dict with string keys and set values
+    def test_dict_with_string_keys_and_set_values(self):
+        """String keys and set values round-trip without key normalization."""
         @dataclass
         class Mapping:
             data: Dict[str, Set[int]]

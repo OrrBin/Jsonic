@@ -98,12 +98,12 @@ class TestSpecialNumbers:
     def test_infinity(self):
         """Infinity should serialize"""
         result = serialize(float('inf'))
-        assert result == float('inf') or result is None
+        assert result == float('inf')
     
     def test_negative_infinity(self):
         """Negative infinity should serialize"""
         result = serialize(float('-inf'))
-        assert result == float('-inf') or result is None
+        assert result == float('-inf')
 
 
 @pytest.mark.edge_case

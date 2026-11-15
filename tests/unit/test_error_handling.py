@@ -424,12 +424,12 @@ class TestPrivateAttributesInCollections:
                 self.value = value
                 self._private = "secret"
         
-        # Can't put in set (not hashable), but test serialization
-        item = Item(42)
-        serialized = serialize(item, serialize_private_attributes=False)
-        
-        # _private should not be in serialized data
-        assert '_private' not in serialized
+        item = Item(42)  # Instances use object identity hashing.
+        serialized = serialize({item}, serialize_private_attributes=False)
+        assert serialized['_is_set'] is True
+        assert len(serialized['items']) == 1
+        assert serialized['items'][0]['value'] == 42
+        assert '_private' not in serialized['items'][0]
 
 
 class TestTransientAttributesEdgeCases:
