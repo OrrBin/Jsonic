@@ -8,7 +8,7 @@ import pytest
 
 # Try to import Pydantic
 try:
-    from pydantic import BaseModel, Field, validator
+    from pydantic import BaseModel, Field, validator, ValidationError
     PYDANTIC_AVAILABLE = True
 except ImportError:
     PYDANTIC_AVAILABLE = False
@@ -94,7 +94,7 @@ class TestPydanticValidation:
         
         # Invalid data raises ValidationError
         data['age'] = -5
-        with pytest.raises(Exception):  # Pydantic ValidationError
+        with pytest.raises(ValidationError):  # Pydantic ValidationError
             deserialize(data, expected_type=User)
     
     def test_field_constraints(self):
@@ -112,7 +112,7 @@ class TestPydanticValidation:
         
         # Invalid price raises error
         data['price'] = -5.0
-        with pytest.raises(Exception):  # Pydantic ValidationError
+        with pytest.raises(ValidationError):  # Pydantic ValidationError
             deserialize(data, expected_type=Product)
     
     def test_missing_required_field_on_deserialization(self):
@@ -129,7 +129,7 @@ class TestPydanticValidation:
         del data['email']
         
         # Should raise ValidationError
-        with pytest.raises(Exception):  # Pydantic ValidationError
+        with pytest.raises(ValidationError):  # Pydantic ValidationError
             deserialize(data, expected_type=User)
     
     def test_wrong_type_on_deserialization(self):
@@ -145,7 +145,7 @@ class TestPydanticValidation:
         data['price'] = "not a number"
         
         # Should raise ValidationError
-        with pytest.raises(Exception):  # Pydantic ValidationError
+        with pytest.raises(ValidationError):  # Pydantic ValidationError
             deserialize(data, expected_type=Product)
     
     def test_nested_validation_error(self):
@@ -168,7 +168,7 @@ class TestPydanticValidation:
         data['address']['zip_code'] = "1"  # Too short
         
         # Should raise ValidationError
-        with pytest.raises(Exception):  # Pydantic ValidationError
+        with pytest.raises(ValidationError):  # Pydantic ValidationError
             deserialize(data, expected_type=User)
 
 

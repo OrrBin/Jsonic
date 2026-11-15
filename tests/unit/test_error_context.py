@@ -1,155 +1,56 @@
-"""Tests for error messages with serialization path context."""
-
+"""Exact public error paths; known adapter path loss belongs to #15."""
 import pytest
-from jsonic import serialize, deserialize, Serializable
+from jsonic import Serializable, deserialize, serialize
+from jsonic.exceptions import DeserializationError, SerializationError
+from jsonic.util import full_type_name
 
+class Bad:
+    def __init__(self):
+        self.bad = object()
 
-class TestSerializationPathContext:
-    """Test that errors include the path to where the error occurred."""
-    
-    def test_nested_serialization_error_includes_path(self):
-        """Error during nested serialization should show the path."""
-        class Unserializable:
-            def __init__(self):
-                self.bad = object()  # Generic object can't be serialized
-        
-        class Container:
-            def __init__(self):
-                self.nested = Unserializable()
-        
-        obj = Container()
-        
-        with pytest.raises(TypeError) as exc_info:
-            serialize(obj)
-        
-        # Error message should include path like "Container.nested"
-        assert 'nested' in str(exc_info.value).lower() or 'path' in str(exc_info.value).lower()
-    
-    def test_deeply_nested_serialization_error_includes_full_path(self):
-        """Error in deeply nested structure should show full path."""
-        class Level3:
-            def __init__(self):
-                self.bad = object()  # Can't serialize generic object
-        
-        class Level2:
-            def __init__(self):
-                self.level3 = Level3()
-        
-        class Level1:
-            def __init__(self):
-                self.level2 = Level2()
-        
-        obj = Level1()
-        
-        with pytest.raises(TypeError) as exc_info:
-            serialize(obj)
-        
-        error_msg = str(exc_info.value).lower()
-        # Should mention the nested path
-        assert 'level2' in error_msg or 'level3' in error_msg or 'path' in error_msg
-    
-    def test_list_serialization_error_includes_index(self):
-        """Error in list element should show index."""
-        class Bad:
-            def __init__(self):
-                self.bad = object()
-        
-        data = [1, 2, Bad(), 4]
-        
-        with pytest.raises(TypeError) as exc_info:
-            serialize(data)
-        
-        error_msg = str(exc_info.value)
-        # Should mention list index or position
-        assert '[' in error_msg or 'index' in error_msg.lower() or 'position' in error_msg.lower()
-    
-    def test_dict_serialization_error_includes_key(self):
-        """Error in dict value should show key."""
-        class Bad:
-            def __init__(self):
-                self.bad = object()
-        
-        data = {'good': 1, 'bad': Bad(), 'also_good': 2}
-        
-        with pytest.raises(TypeError) as exc_info:
-            serialize(data)
-        
-        error_msg = str(exc_info.value)
-        # Should mention the key
-        assert 'bad' in error_msg.lower() or 'key' in error_msg.lower()
-    
-    def test_deserialization_error_includes_path(self):
-        """Error during deserialization should show path."""
-        class Inner:
-            def __init__(self, required_param):
-                self.required_param = required_param
-        
-        class Outer(Serializable):
-            def __init__(self, inner):
-                super().__init__()
-                self.inner = inner
-        
-        # Missing required_param in inner
-        bad_data = {
-            '_serialized_type': 'tests.unit.test_error_context.Outer',
-            'inner': {
-                '_serialized_type': 'tests.unit.test_error_context.Inner'
-                # Missing 'required_param'
-            }
-        }
-        
-        with pytest.raises((AttributeError, TypeError)) as exc_info:
-            deserialize(bad_data)
-        
-        error_msg = str(exc_info.value).lower()
-        # Should mention the path or field name
-        assert 'inner' in error_msg or 'required_param' in error_msg or 'path' in error_msg
+@pytest.mark.parametrize('wrap,path', [
+    (lambda v: {'nested': v}, 'nested.bad'),
+    (lambda v: {'level2': {'level3': v}}, 'level2.level3.bad'),
+    (lambda v: [1, 2, v, 4], '[2].bad'),
+    (lambda v: {'bad': v}, 'bad.bad'),
+])
+def test_serialization_preserves_exact_path(wrap, path):
+    with pytest.raises(SerializationError) as error:
+        serialize(wrap(Bad()))
+    assert error.value.path == path
+    assert str(error.value).endswith('at path: ' + path)
 
+@pytest.mark.parametrize('field', ['inner', 'nested'])
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason='F13/#15: registered-parent decoder drops parent path')
+def test_registered_parent_missing_field_preserves_exact_path(field):
+    calls = []
+    class Child(Serializable):
+        def __init__(self, required):
+            calls.append('child constructed')
+            self.required = required
+    class Parent(Serializable):
+        def __init__(self, **kwargs):
+            calls.append('parent constructed')
+    payload = {'_serialized_type': full_type_name(Parent),
+               field: {'_serialized_type': full_type_name(Child)}}
+    with pytest.raises(DeserializationError, match='Missing attribute.*required') as error:
+        deserialize(payload, safe=True)
+    assert calls == []
+    assert error.value.path == field
 
-class TestDeserializationPathContext:
-    """Test deserialization errors include path context."""
-    
-    def test_missing_field_error_shows_path(self):
-        """Missing field error should show where in structure."""
-        class Nested:
-            def __init__(self, value):
-                self.value = value
-        
-        class Parent(Serializable):
-            def __init__(self, nested):
-                super().__init__()
-                self.nested = nested
-        
-        bad_data = {
-            '_serialized_type': 'tests.unit.test_error_context.Parent',
-            'nested': {
-                '_serialized_type': 'tests.unit.test_error_context.Nested'
-                # Missing 'value'
-            }
-        }
-        
-        with pytest.raises((AttributeError, TypeError)) as exc_info:
-            deserialize(bad_data)
-        
-        error_msg = str(exc_info.value)
-        # Should mention nested or value
-        assert 'nested' in error_msg.lower() or 'value' in error_msg.lower()
-    
-    def test_list_deserialization_error_includes_index(self):
-        """Error deserializing list element should show index."""
-        class Item:
-            def __init__(self, required):
-                self.required = required
-        
-        bad_data = [
-            {'_serialized_type': 'tests.unit.test_error_context.Item', 'required': 1},
-            {'_serialized_type': 'tests.unit.test_error_context.Item'},  # Missing required
-            {'_serialized_type': 'tests.unit.test_error_context.Item', 'required': 3}
-        ]
-        
-        with pytest.raises((AttributeError, TypeError)) as exc_info:
-            deserialize(bad_data)
-        
-        error_msg = str(exc_info.value)
-        # Should mention index or position
-        assert '[' in error_msg or 'index' in error_msg.lower() or '1' in error_msg
+def test_missing_list_member_field_reaches_constructor_binding():
+    calls = []
+    class Item(Serializable):
+        def __init__(self, required):
+            calls.append(required)
+            self.required = required
+    tag = full_type_name(Item)
+    payload = [{'_serialized_type': tag, 'required': 1}, {'_serialized_type': tag}]
+    with pytest.raises(DeserializationError, match='Missing attribute.*required') as error:
+        deserialize(payload, safe=True)
+    assert calls == [1]
+    assert error.value.path == '[1]'
+
+def test_tuple_dictionary_keys_are_explicitly_rejected():
+    with pytest.raises(TypeError, match='keys must be'):
+        serialize({(1, 2): {3, 4}})

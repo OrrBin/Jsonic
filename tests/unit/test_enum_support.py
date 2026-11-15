@@ -176,12 +176,21 @@ class TestEnumEdgeCases:
     """Test enum edge cases"""
     
     def test_enum_with_duplicate_values(self):
-        """Enum with duplicate values (aliases) - skip due to local class limitation"""
-        pytest.skip("Local enum classes cannot be deserialized (not at module level)")
+        from jsonic import register_jsonic_type
+        class Aliased(Enum):
+            FIRST = 1
+            SECOND = 1
+        register_jsonic_type(Aliased)
+        payload = serialize(Aliased.FIRST)
+        payload['name'] = 'SECOND'
+        assert deserialize(payload, safe=True) is Aliased.FIRST
     
     def test_enum_with_none_value(self):
-        """Enum with None as a value - skip due to local class limitation"""
-        pytest.skip("Local enum classes cannot be deserialized (not at module level)")
+        from jsonic import register_jsonic_type
+        class Nullable(Enum):
+            NOTHING = None
+        register_jsonic_type(Nullable)
+        assert deserialize(serialize(Nullable.NOTHING), safe=True) is Nullable.NOTHING
     
     def test_mixed_enum_types_in_list(self):
         """List with different enum types"""

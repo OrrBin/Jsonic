@@ -3,6 +3,9 @@ import pytest
 
 from jsonic import Serializable
 from jsonic.decorators import _JsonicSerializer, _JsonicDeserializer
+from jsonic.type_resolver import _registry
+
+pytest_plugins = ('pytester',)
 
 
 @pytest.fixture(autouse=True)
@@ -14,6 +17,7 @@ def reset_global_state():
     original_codec_types = _JsonicDeserializer.types.copy()
     original_type_ids = _JsonicSerializer.type_ids.copy()
     original_encoder_types = _JsonicSerializer.types.copy()
+    original_resolvers = list(_registry._resolvers)
     
     yield
     
@@ -23,6 +27,7 @@ def reset_global_state():
     _JsonicDeserializer.types = original_codec_types
     _JsonicSerializer.type_ids = original_type_ids
     _JsonicSerializer.types = original_encoder_types
+    _registry._resolvers = original_resolvers
 
 
 @pytest.fixture
