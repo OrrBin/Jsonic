@@ -1,7 +1,9 @@
 """Unit tests for deserialize() function"""
 import pytest
+import json
 from datetime import datetime
 from jsonic import serialize, deserialize, Serializable
+from jsonic.exceptions import DeserializationError
 
 
 @pytest.mark.unit
@@ -232,7 +234,7 @@ class TestErrorHandling:
     
     def test_invalid_json_string(self):
         """Invalid JSON string should raise error"""
-        with pytest.raises(Exception):  # json.JSONDecodeError
+        with pytest.raises(json.JSONDecodeError):
             deserialize("invalid json{", string_input=True)
     
     def test_unknown_type_name(self):
@@ -241,7 +243,7 @@ class TestErrorHandling:
             "_serialized_type": "NonExistent.Class.Name",
             "field": "value"
         }
-        with pytest.raises(Exception):  # ModuleNotFoundError or AttributeError
+        with pytest.raises(TypeError, match='Could not find type: NonExistent.Class.Name'):
             deserialize(data)
     
     def test_missing_required_init_parameter(self):
@@ -257,7 +259,7 @@ class TestErrorHandling:
         serialized = serialize(user)
         del serialized['age']  # Remove required field
         
-        with pytest.raises(Exception):  # TypeError or AttributeError
+        with pytest.raises(DeserializationError, match='Missing attribute.*age'):
             deserialize(serialized)
 
 
