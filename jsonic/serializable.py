@@ -490,10 +490,11 @@ def _deserialize_with_custom_deserializer(obj, expected_type: type = None, path=
     if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj:
         type_name = obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
         if type_name in _JsonicDeserializer.deserializers:
-            del obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
-            result = _JsonicDeserializer.deserializers[type_name](obj)
-            obj[SERIALIZED_TYPE_ATTRIBUTE_NAME] = type_name
-            return result
+            # A shallow copy protects the outer mapping. Nested values remain
+            # shared with custom hooks for backward-compatible identity semantics.
+            data = {key: value for key, value in obj.items()
+                    if key != SERIALIZED_TYPE_ATTRIBUTE_NAME}
+            return _JsonicDeserializer.deserializers[type_name](data)
 
         raise DeserializationError(f'Could not find custom deserializer for object with type tag: {type_name}', path)
 
