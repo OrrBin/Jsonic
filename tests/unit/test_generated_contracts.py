@@ -97,8 +97,8 @@ def test_selection_precedence_matches_simple_reference_rule(adapter, shape):
 
 
 @pytest.mark.parametrize('shape', ['root', 'list', 'dict',
-    pytest.param('tuple', marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason='F08/#10: tuple private option')),
-    pytest.param('set', marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason='F08/#10: set private option')),
+    'tuple',
+    'set',
 ])
 def test_private_option_survives_supported_container_boundaries(shape):
     cls = prepare_adapter('registered')

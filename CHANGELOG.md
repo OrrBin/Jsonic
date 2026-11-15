@@ -1,5 +1,14 @@
 # Unreleased
 
+## F08 — tuple/set traversal context (#10)
+
+Built-in tuple/set adapters preserve private-field options and parent paths in
+both directions using a call-local traversal context. Selection and safe-mode
+authorization continue to flow through recursive callbacks. Omitting the
+private decoding option in a nested callback inherits its caller's option;
+an explicit False still excludes private fields. Root defaults and wire tags
+are unchanged. Context is reset on success and failure and isolated by task/thread.
+
 ## F07 — mixed dictionary/slot layouts (#9)
 
 Registered types, generic objects and type-hinted resolvers share an attribute
