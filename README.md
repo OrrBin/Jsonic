@@ -1,5 +1,20 @@
 # Jsonic
 
+### Decoding externally supplied data
+
+For API requests, uploaded configuration, and message queues, use
+`deserialize(payload, safe=True)`. Register every trusted reconstructed class
+with `register_jsonic_type(MyClass)` (subclassing `Serializable` registers it
+automatically). An explicit `expected_type=MyClass` authorizes that class for
+the call; nested classes still need registration. Unknown tags are rejected
+before any reconstruction runs, including tags inside tuples, sets, and
+Pydantic models. Custom decoders and registered constructors are trusted code
+and may have side effects; registration is not a sandbox.
+
+The backward-compatible default `deserialize(payload)` permits dynamic module
+imports and constructors selected by the payload. Use it only for trusted data.
+Safe mode does not provide field validation or resource limits.
+
 [![PyPI version](https://badge.fury.io/py/py-jsonic.svg)](https://badge.fury.io/py/py-jsonic)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
