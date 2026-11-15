@@ -15,6 +15,9 @@ The backward-compatible default `deserialize(payload)` permits dynamic module
 imports and constructors selected by the payload. Use it only for trusted data.
 Safe mode does not provide field validation or resource limits.
 
+See [resolver compatibility and traversal context](RESOLVERS.md) for custom
+resolver signatures, inherited child traversal and structured error details.
+
 Field selectors apply to each member of root and nested collections. Exclusion
 wins if `include` and `exclude` overlap, at every nesting level. Excluded fields
 are skipped before built-in traversal. Selectors use dots as path separators;

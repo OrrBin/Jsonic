@@ -1,5 +1,9 @@
 # Package testing guide and audit results
 
+This is the historical testing-expansion report merged in PRs #32–#37.
+See [the traversal-fix validation report](TRAVERSAL_VALIDATION.md) for the newer
+suite totals and the five expected failures now fixed by #10, #15 and #16.
+
 Implemented for tracking issue #25 and follow-ups #26–#31 on 15 November 2026.
 Production code and the wire format are unchanged. Known product defects remain
 owned by their original issues; adding tests does not claim to fix them.

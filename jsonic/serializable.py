@@ -486,11 +486,11 @@ def _serialize_object(obj, serialize_private_attributes=False, path=""):
             return result
 
     # Priority 3: Type resolvers (dataclass=50, typehinted=25)
-    from jsonic.type_resolver import get_resolver_for_type
+    from jsonic.type_resolver import get_resolver_for_type, serialize_with_resolver
     resolver = get_resolver_for_type(typ)
     if resolver:
         result = _handle_serialization_error(
-            lambda: resolver.serialize(obj, serialize_private_attributes),
+            lambda: serialize_with_resolver(resolver, obj, current_context()),
             path
         )
         result = dict(result)
@@ -712,13 +712,15 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
 
     # Try type resolver (but not for Serializable types - they have priority)
     if not is_jsonic_type:
-        from jsonic.type_resolver import get_resolver_for_type
+        from jsonic.type_resolver import get_resolver_for_type, deserialize_with_resolver
         resolver = get_resolver_for_type(cls)
         if resolver:
             context = current_context()
             data = {key: context.deserialize(value, key) for key, value in obj.items()
                     if key != SERIALIZED_TYPE_ATTRIBUTE_NAME}
-            return _handle_deserialization_error(lambda: resolver.deserialize(data, cls), path)
+            return _handle_deserialization_error(
+                lambda: deserialize_with_resolver(resolver, data, cls, context), path
+            )
 
     context = current_context()
     deserialized_dict = {key: context.deserialize(value, key) for key, value in obj.items()

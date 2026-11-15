@@ -2,6 +2,8 @@
 
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Type, Optional
+import inspect
+from jsonic.context import TraversalContext
 
 
 class TypeResolver(ABC):
@@ -13,13 +15,21 @@ class TypeResolver(ABC):
         pass
     
     @abstractmethod
-    def serialize(self, obj: Any) -> Dict[str, Any]:
-        """Serialize an object of the resolved type."""
+    def serialize(self, obj: Any, *, context: Optional[TraversalContext] = None) -> Dict[str, Any]:
+        """Return a mapping; use optional context.serialize for nested children.
+
+        Existing one-argument implementations and legacy (obj, private_flag)
+        implementations remain supported by the public dispatcher.
+        """
         pass
     
     @abstractmethod
-    def deserialize(self, data: Dict[str, Any], cls: Type) -> Any:
-        """Deserialize data into an instance of the resolved type."""
+    def deserialize(self, data: Dict[str, Any], cls: Type, *, context: Optional[TraversalContext] = None) -> Any:
+        """Construct cls from children already decoded by the dispatcher.
+
+        Do not deserialize those children again. Optional context provides the
+        current parent path/options for additional adapter-owned traversal.
+        """
         pass
     
     @abstractmethod
@@ -59,3 +69,30 @@ def register_resolver(resolver: TypeResolver):
 def get_resolver_for_type(cls: Type) -> Optional[TypeResolver]:
     """Get resolver for a given type from the global registry."""
     return _registry.get_resolver(cls)
+
+
+def _invoke(method, candidates, context):
+    """Choose a supported signature before invoking user code exactly once."""
+    try:
+        signature = inspect.signature(method)
+    except (TypeError, ValueError):
+        # Opaque/C-backed callables retain the dispatcher's historical call
+        # shape. There is no safe way to infer a new protocol or retry them.
+        return method(*candidates[0])
+    kwargs = {'context': context} if 'context' in signature.parameters else {}
+    for args in candidates:
+        try:
+            signature.bind(*args, **kwargs)
+        except TypeError:
+            continue
+        return method(*args, **kwargs)
+    raise TypeError(f'Unsupported resolver signature: {signature}')
+
+
+def serialize_with_resolver(resolver, obj, context):
+    return _invoke(resolver.serialize,
+                   [(obj, context.serialize_private_attributes), (obj,)], context)
+
+
+def deserialize_with_resolver(resolver, data, cls, context):
+    return _invoke(resolver.deserialize, [(data, cls)], context)
