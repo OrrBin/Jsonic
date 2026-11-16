@@ -28,29 +28,16 @@ class TypeHintedResolver(TypeResolver):
 
     def deserialize(self, data: Dict[str, Any], cls: Type) -> Any:
         """Deserialize data using type hints from __init__."""
-        sig = inspect.signature(cls.__init__)
-        init_params = {}
-        
-        for param_name, param in sig.parameters.items():
-            if param_name == 'self':
-                continue
-            if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
-                continue
-            
-            if param_name in data:
-                init_params[param_name] = data[param_name]
-            elif param.default != inspect.Parameter.empty:
-                # Has default, will be used automatically
-                pass
-            # If no value and no default, let __init__ raise the error
+        from jsonic.constructors import constructor_kwargs, restore_attributes
+        from jsonic.context import current_context
+        private = current_context().deserialize_private_attributes
+        init_params = constructor_kwargs(cls, data, private=private)
         
         # Create instance
         instance = cls(**init_params)
         
         # Set any additional attributes not in __init__
-        for key, value in data.items():
-            if key not in init_params:
-                setattr(instance, key, value)
+        restore_attributes(instance, {k: v for k, v in data.items() if k not in init_params}, private=private)
         
         return instance
     

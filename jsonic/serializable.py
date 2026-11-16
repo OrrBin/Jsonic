@@ -3,9 +3,11 @@ import inspect
 import json
 from contextvars import ContextVar
 from dataclasses import replace
-from jsonic.context import _traversal, current_context
+from jsonic.context import _traversal, current_context, _serializing, _SerializationFrame
+from threading import get_ident
 from enum import Enum, Flag
 from typing import List, Dict
+from uuid import UUID
 
 from jsonic.decorators import _JsonicSerializer, _JsonicDeserializer
 from jsonic.util import full_type_name, is_private_attribute
@@ -31,22 +33,27 @@ class EnumEncoder(json.JSONEncoder):
         obj = self._convert_enums(obj)
         return super().encode(obj)
     
-    def _convert_enums(self, obj):
-        """Recursively convert all enum instances"""
+    def _convert_enums(self, obj, _active=None):
+        """Convert enum values while rejecting cycles in raw codec mappings."""
         if isinstance(obj, Enum):
-            return {
-                'name': obj.name,
-                'value': obj.value,
-                SERIALIZED_TYPE_ATTRIBUTE_NAME: full_type_name(type(obj))
-            }
-        elif isinstance(obj, dict):
-            return {k: self._convert_enums(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [self._convert_enums(item) for item in obj]
-        elif isinstance(obj, tuple):
-            return tuple(self._convert_enums(item) for item in obj)
-        return obj
-    
+            return {'name': obj.name, 'value': obj.value,
+                    SERIALIZED_TYPE_ATTRIBUTE_NAME: full_type_name(type(obj))}
+        if not isinstance(obj, (dict, list, tuple)):
+            return obj
+        active = set() if _active is None else _active
+        identity = id(obj)
+        if identity in active:
+            raise ValueError('Circular reference detected during serialization')
+        active.add(identity)
+        try:
+            if isinstance(obj, dict):
+                return {key: self._convert_enums(value, active) for key, value in obj.items()}
+            if isinstance(obj, list):
+                return [self._convert_enums(value, active) for value in obj]
+            return tuple(self._convert_enums(value, active) for value in obj)
+        finally:
+            active.remove(identity)
+
     def default(self, obj):
         if isinstance(obj, Enum):
             return {
@@ -112,7 +119,7 @@ class Serializable:
         register_jsonic_type(cls, cls.transient_attributes, cls.init_parameters_mapping)
 
 
-def serialize(obj, serialize_private_attributes=False, string_output=False, include=None, exclude=None):
+def serialize(obj, serialize_private_attributes=False, string_output=False, include=None, exclude=None, *, uuid_format=None):
     """
      Serializes ``class instance`` / ``dict`` / ``list`` / ``other python type`` into ``dictionary`` / ``json string`` representing the input
 
@@ -130,13 +137,20 @@ def serialize(obj, serialize_private_attributes=False, string_output=False, incl
         Only class instances of classes extending ``Serializable`` or registered using ``register_jsonic_type`` can be serialized
         If both include and exclude select a field, exclude takes precedence
     """
-    token = _selection.set(_FieldSelection(include, exclude))
+    context = current_context()
+    uuid_format = context.uuid_format if uuid_format is None else uuid_format
+    if uuid_format not in ('legacy', 'string'):
+        raise ValueError("uuid_format must be 'legacy' or 'string'")
+    selection = _FieldSelection(include, exclude)
+    context_token = _traversal.set(replace(context, uuid_format=uuid_format))
+    token = _selection.set(selection)
     try:
         obj = _handle_serialization_error(
             lambda: _preprocess_for_serialization(obj, serialize_private_attributes, ""), ""
         )
     finally:
         _selection.reset(token)
+        _traversal.reset(context_token)
 
     # Use custom encoder that handles nested enums
     json_str = json.dumps(obj, cls=EnumEncoder)
@@ -244,9 +258,24 @@ def _preprocess_for_serialization(obj, serialize_private_attributes=None, path=N
     private = context.serialize_private_attributes if serialize_private_attributes is None else serialize_private_attributes
     path = context.path if path is None else path
     token = _traversal.set(replace(context, path=path, serialize_private_attributes=private))
+    active_token = None
+    frame = None
     try:
+        if obj is not None and not isinstance(obj, (bool, int, float, str)):
+            owner = get_ident()
+            ancestors = tuple(f for f in _serializing.get() if f.active and f.owner == owner)
+            if any(f.value is obj for f in ancestors):
+                raise ValueError('Circular reference detected during serialization')
+            frame = _SerializationFrame(obj, owner)
+            active_token = _serializing.set(ancestors + (frame,))
         return _preprocess_impl(obj, private, path)
     finally:
+        if frame is not None:
+            # Copied task contexts must not retain a live ancestor after its
+            # synchronous call finishes, or hold on to the source object.
+            frame.active, frame.value = False, None
+        if active_token is not None:
+            _serializing.reset(active_token)
         _traversal.reset(token)
 
 
@@ -444,7 +473,9 @@ def register_jsonic_type(cls, transient_attributes: List[str] = None,
 def _serialize_object(obj, serialize_private_attributes=False, path=""):
     """Serialize an object with path tracking for better error messages."""
     typ = type(obj)
-    
+    if typ is UUID and current_context().uuid_format == 'string':
+        return {'uuid': str(obj), SERIALIZED_TYPE_ATTRIBUTE_NAME: 'uuid.UUID'}
+
     # Check for Pydantic model first (before other checks)
     if is_pydantic_model(obj):
         selection = _selection.get() or _FieldSelection()
@@ -476,6 +507,10 @@ def _serialize_object(obj, serialize_private_attributes=False, path=""):
     is_jsonic_type = type_name in Serializable.jsonic_types
     
     if is_jsonic_type:
+        import dataclasses
+        if dataclasses.is_dataclass(typ):
+            from jsonic.constructors import reject_required_initvars
+            reject_required_initvars(typ, serializing=True)
         type_data = Serializable.jsonic_types[type_name]
         
         if hasattr(obj, '__dict__') or hasattr(obj, '__slots__'):
@@ -727,45 +762,16 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
                          if key != SERIALIZED_TYPE_ATTRIBUTE_NAME
                          and (deserialize_private_attributes or not key.startswith('_'))}
 
-    init_dict = {}
-
-    sign = inspect.signature(cls.__init__)
-
-    init_parameters_mapping = Serializable.jsonic_types[type_name].init_parameters_mapping if is_jsonic_type else {}
-    transient_attrs = Serializable.jsonic_types[type_name].transient_attributes if is_jsonic_type else []
-
-    for parameter_name, parameter_data in sign.parameters.items():
-        if not deserialize_private_attributes and is_private_attribute(parameter_name):
-            continue
-        if parameter_name == 'self':
-            pass
-        elif parameter_data.kind == inspect.Parameter.VAR_KEYWORD or \
-                parameter_data.kind == inspect.Parameter.VAR_POSITIONAL:
-            pass
-        elif parameter_name in init_parameters_mapping:
-            init_dict[parameter_name] = deserialized_dict[init_parameters_mapping[parameter_name]]
-        else:  # assuming parameter has same name as corresponding attribute
-            # Skip transient attributes only if they have a default value
-            if transient_attrs and parameter_name in transient_attrs:
-                if parameter_data.default != inspect.Parameter.empty:
-                    continue
-            if parameter_name not in deserialized_dict:
-                raise DeserializationError(f'Missing attribute in given dict to match __init__ parameter: {parameter_name}.\n'
-                                     f'If relevant, consider registering type "{type_name}" using "register_jsonic_type" '
-                                     f'and providing required "init_parameters_mapping".', path,
-                                             code='missing_field', field=parameter_name)
-            init_dict[parameter_name] = deserialized_dict[parameter_name]
-
+    from jsonic.constructors import constructor_kwargs, restore_attributes, reject_required_initvars
+    import dataclasses
+    if dataclasses.is_dataclass(cls):
+        reject_required_initvars(cls)
+    type_data = Serializable.jsonic_types.get(type_name)
+    mapping = type_data.init_parameters_mapping if type_data else {}
+    transient = type_data.transient_attributes if type_data else ()
+    init_dict = constructor_kwargs(cls, deserialized_dict, mapping, transient, deserialize_private_attributes)
     created_instance = cls(**init_dict)
-
-    # After creating the instance, set all it's attributes to deserialized value
-    for attr_name, attr_value in deserialized_dict.items():
-        if not deserialize_private_attributes and is_private_attribute(attr_name):
-            continue
-        # Skip transient attributes
-        if transient_attrs and attr_name in transient_attrs:
-            continue
-        setattr(created_instance, attr_name, attr_value)
+    restore_attributes(created_instance, deserialized_dict, transient, deserialize_private_attributes)
 
     return created_instance
 

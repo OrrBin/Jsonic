@@ -67,7 +67,6 @@ def test_mapped_constructor_and_transient_default():
     assert restored.cache == 'default cache'
 
 
-@pytest.mark.xfail(strict=True, raises=FrozenInstanceError, reason='F10/#12: frozen init=False fields are assigned after construction')
 def test_frozen_noninit_field_roundtrip_preserves_invariants():
     @dataclass(frozen=True)
     class Record:
@@ -79,20 +78,17 @@ def test_frozen_noninit_field_roundtrip_preserves_invariants():
     assert deserialize(serialize(value), expected_type=Record, safe=True) == value
 
 
-@pytest.mark.xfail(strict=True, raises=DeserializationError, reason='F10/#12: omitted Serializable default is rejected')
 def test_defaulted_serializable_parameter_can_be_omitted():
     class Record(Serializable):
         def __init__(self, value=7): self.value = value
     assert deserialize({'_serialized_type': full_type_name(Record)}, safe=True).value == 7
 
 
-@pytest.mark.xfail(strict=True, raises=DeserializationError, reason='F10/#12: UUID lacks a reliable explicit codec')
 def test_uuid_advertised_roundtrip():
     value = UUID('12345678-1234-5678-1234-567812345678')
     assert deserialize(serialize(value), expected_type=UUID) == value
 
 
-@pytest.mark.xfail(strict=True, raises=TypeError, reason='F10/#12: required InitVar is not represented in stored fields')
 def test_required_initvar_has_an_explicit_reconstruction_contract():
     from dataclasses import InitVar
     @dataclass
@@ -100,4 +96,10 @@ def test_required_initvar_has_an_explicit_reconstruction_contract():
         seed: InitVar[int]
         value: int = field(init=False)
         def __post_init__(self, seed): self.value = seed * 2
-    assert deserialize(serialize(Record(4)), expected_type=Record).value == 8
+    from jsonic.exceptions import SerializationError
+    original = Record(4)
+    with pytest.raises(SerializationError, match='Required InitVar.*seed') as error:
+        serialize(original)
+    assert error.value.code == 'unsupported_initvar'
+    assert error.value.field == 'seed'
+    assert original.value == 8

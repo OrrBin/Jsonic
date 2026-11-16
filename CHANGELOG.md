@@ -1,5 +1,29 @@
 # Unreleased
 
+## F10 — constructor defaults, frozen fields and UUIDs (#12)
+
+Generic/Serializable and type-hinted reconstruction share missing/defaulted
+argument rules, including mapped and transient defaults. Frozen dataclasses
+recompute non-init fields during construction and validate stored values;
+they are never overwritten by bypassing immutability. Mutable non-init fields
+retain legacy restoration. Required InitVar inputs are explicitly unsupported:
+serialization/decoding fail clearly and a custom codec is required to persist
+them. This rejects an unsupported shape earlier, rather than emitting data
+that cannot reconstruct its constructor inputs.
+
+UUID decoding accepts historical int/is_safe payloads without changing default
+writer output. `serialize(..., uuid_format='string')` opts into a portable UUID
+string representation; it preserves identifier value and omits process-local
+is_safe metadata. The format option propagates through nested traversal. New
+UUID output is opt-in for minor-release compatibility; no release is published.
+
+Cycle rejection checks live ancestor frames before recursive object traversal
+and guards raw custom-codec mappings during JSON conversion. This avoids the
+recursion-limit-dependent rejection that caused a Python 3.8 abort during
+validation. Shared references remain valid, completed task contexts do not keep
+stale ancestors active, and independent threads have separate ancestor paths.
+The default still rejects cycles; #1's optional ignore policy is separate work.
+
 ## F14 — executable resolver protocol (#16)
 
 The dispatcher supports the documented one-payload serializer and the legacy

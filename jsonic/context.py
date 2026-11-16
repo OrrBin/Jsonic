@@ -8,6 +8,7 @@ class TraversalContext:
     path: str = ''
     serialize_private_attributes: bool = False
     deserialize_private_attributes: bool = False
+    uuid_format: str = 'legacy'
 
     def child_path(self, key):
         if isinstance(key, int):
@@ -50,3 +51,13 @@ _traversal = ContextVar('jsonic_traversal', default=TraversalContext())
 
 def current_context():
     return _traversal.get()
+
+
+class _SerializationFrame:
+    __slots__ = ('value', 'owner', 'active')
+
+    def __init__(self, value, owner):
+        self.value, self.owner, self.active = value, owner, True
+
+
+_serializing = ContextVar('jsonic_active_serialization', default=())
