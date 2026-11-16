@@ -1,6 +1,6 @@
 # Jsonic Roadmap
 
-## Current development state: 2.0.0.dev0 (unreleased)
+## Current candidate: 2.0.0rc1 (unpublished)
 
 See README.md for implemented contracts, RELEASE.md for Python/dependency
 support and CI, and MIGRATION.md for upgrade behavior. Published PyPI 1.0.1

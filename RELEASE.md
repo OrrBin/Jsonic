@@ -1,11 +1,11 @@
 # Build, support and release policy
 
-## Development version and support
+## Release candidate and support
 
-This checkout is `2.0.0.dev0`, an unpublished development version. The official
+This checkout is `2.0.0rc1`, an unpublished release candidate. The official
 [PyPI metadata](https://pypi.org/pypi/py-jsonic/json) checked on 16 November 2026
 reports latest `1.0.1` with `Requires-Python: >=3.6`. We do not reuse that release
-number or claim the new API is already published. A major development line
+number or claim the new API is already published. A major release candidate
 accounts for stricter behavior and the explicitly narrowed interpreter range.
 
 The declared range is Python **3.8 through 3.13**, matching the CI matrix.
