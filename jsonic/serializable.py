@@ -379,12 +379,15 @@ def _payload_type(obj, expected):
 
 
 def deserialize(obj, deserialize_private_attributes=None, string_input=False,
-                expected_type=None, _path=None, *, safe=None, wire_format='legacy'):
+                expected_type=None, _path=None, *, safe=None, wire_format='legacy', validation=None, unknown_fields='forbid'):
     """Decode data; omitted private-field options inherit the active traversal.
 
     Use safe=True for externally supplied data. Safe decoding only reconstructs
     explicitly authorized classes/codecs; legacy decoding is for trusted data.
     Root expected_type uses exact identity and does not validate field values.
+    validation='strict' explicitly structures a supported schema from plain or
+    tagged input, with no coercion and unknown_fields='forbid' (or 'ignore').
+    See VALIDATION_MODES.md for the scoped contract.
     """
     if wire_format not in ('legacy', 'v2'):
         raise ValueError("wire_format must be 'legacy' or 'v2'")
@@ -392,6 +395,19 @@ def deserialize(obj, deserialize_private_attributes=None, string_input=False,
         from jsonic.wire import unpack
         obj = unpack(json.loads(obj) if string_input else obj)
         string_input = False
+    if validation not in (None, 'strict'):
+        raise ValueError("validation must be None or 'strict'")
+    if validation == 'strict':
+        if expected_type is None:
+            raise ValueError('Strict validation requires expected_type')
+        from jsonic.structuring import structure
+        if string_input:
+            if not isinstance(obj, str):
+                raise DeserializationError('string_input requires str')
+            obj = json.loads(obj)
+        return structure(obj, expected_type, unknown_fields, _path or '', safe=safe)
+    if unknown_fields != 'forbid':
+        raise ValueError('unknown_fields applies only to strict validation')
     context = current_context()
     private = context.deserialize_private_attributes if deserialize_private_attributes is None else deserialize_private_attributes
     path = context.path if _path is None else _path

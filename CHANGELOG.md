@@ -159,3 +159,13 @@ keys are validated before reconstruction. Default legacy wire contracts remain
 unchanged. V2 requires a new reader; see WIRE_FORMAT.md for migration and custom
 codec responsibilities. This is additive opt-in functionality, not a default
 wire-format replacement.
+
+## F12 — explicit strict structuring (#2, #14)
+
+Add `validation='strict'` to deserialize with an explicit expected schema.
+Validate a scoped subset of primitive/container/union/literal and annotated-class
+inputs without coercion before constructing any schema objects. Unknown fields
+are rejected unless explicitly ignored; matching class tags are schema-bound,
+not imported. Defaults, frozen invariants, forward references, safe nested calls
+and error paths have dedicated cases. Unsupported schemas fail explicitly.
+Default root-only type checking remains unchanged. See VALIDATION_MODES.md.
