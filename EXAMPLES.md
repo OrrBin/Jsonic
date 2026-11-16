@@ -1108,7 +1108,7 @@ def serialize_decimal(obj: Decimal) -> dict:
         '_serialized_type': 'Decimal'
     }
 
-@jsonic_deserializer('Decimal')
+@jsonic_deserializer(Decimal)
 def deserialize_decimal(data: dict) -> Decimal:
     return Decimal(data['value'])
 
@@ -1308,7 +1308,7 @@ class Product:
 
 ### 3. Use expected_type for Safety
 ```python
-# Type-safe deserialization
+# Root-type-checked deserialization (field validation is opt-in)
 user = deserialize(data, expected_type=User)
 
 # Catches type mismatches early

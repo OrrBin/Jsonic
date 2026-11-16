@@ -45,3 +45,12 @@ The first GitHub run exposed an infrastructure issue: ubuntu-latest moved to
 Windows 2022 and macOS 15, with current action versions. Remote run results
 are recorded separately after the corrected workflow completes. No local
 result is presented as Windows/Linux evidence.
+
+The corrected runner matrix also exposed two previously untested contracts:
+Python 3.9/3.10 GenericAlias objects can pass isinstance(..., type), and Windows
+fixture reads used the locale code page. The legacy concrete-type guard now
+checks typing origin before safe authorization; its existing regression covers
+both safe and legacy calls. Unicode fixtures/docs read UTF-8 explicitly and
+documentation child-process streams agree on UTF-8. Three additional safe-mode
+parameter cases raise the final collection from 1,019 to 1,022. No skips/xfails
+were introduced to conceal these failures.

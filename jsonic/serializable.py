@@ -6,7 +6,7 @@ from dataclasses import replace
 from jsonic.context import _traversal, current_context, _serializing, _SerializationFrame
 from threading import get_ident
 from enum import Enum, Flag
-from typing import List, Dict
+from typing import List, Dict, get_origin
 from uuid import UUID
 
 from jsonic.wire import LiteralDict
@@ -434,6 +434,8 @@ def _deserialize_with_policy(obj, deserialize_private_attributes=False, string_i
     trusted application code; it does not sandbox constructors or hooks.
     The default retains legacy dynamic imports for backward compatibility.
     """
+    if expected_type is not None and (not isinstance(expected_type, type) or get_origin(expected_type) is not None):
+        raise TypeError('expected_type must be a concrete Python type')
     policy = _safe_types.get()
     token = None
     if safe is True and policy is None:
@@ -452,8 +454,6 @@ def _deserialize_with_policy(obj, deserialize_private_attributes=False, string_i
                 string_input = False
             _validate_safe_payload(obj, policy, _path)
         if expected_type is not None:
-            if not isinstance(expected_type, type):
-                raise TypeError("expected_type must be a concrete Python type")
             source = json.loads(obj) if string_input and isinstance(obj, str) else obj
             actual = _payload_type(source, expected_type)
             _check_expected_type(actual, expected_type, _path)

@@ -7,7 +7,7 @@ import sys
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-GOLDEN = json.loads((ROOT / 'tests/fixtures/wire/v1.json').read_text())['cases']
+GOLDEN = json.loads((ROOT / 'tests/fixtures/wire/v1.json').read_text(encoding='utf-8'))['cases']
 
 
 def worker(tmp_path, action, name, payload=None, safe=False, register=True, library_root=ROOT):
@@ -47,7 +47,7 @@ def test_fresh_writer_and_reader_with_golden_payloads(tmp_path, name, safe):
 @pytest.mark.parametrize('safe', [False, True])
 @pytest.mark.parametrize('variant', ['combined_flags_python38', 'combined_flags_python312'])
 def test_combined_flag_wire_variants_from_different_python_versions(tmp_path, safe, variant):
-    variants = json.loads((ROOT / 'tests/fixtures/wire/v1.json').read_text())['historical_variants']
+    variants = json.loads((ROOT / 'tests/fixtures/wire/v1.json').read_text(encoding='utf-8'))['historical_variants']
     code, read = worker(tmp_path, 'read', 'combined_flags', payload=variants[variant], safe=safe)
     assert code == 0, read
     assert read['value']['value'] == 3

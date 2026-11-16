@@ -38,7 +38,7 @@ else:
 
 
 def test_v2_golden_and_actual_old_reader(tmp_path, pytestconfig):
-    fixture = json.loads((ROOT / 'tests/fixtures/wire/v2.json').read_text())
+    fixture = json.loads((ROOT / 'tests/fixtures/wire/v2.json').read_text(encoding='utf-8'))
     value = {'_serialized_type': 'literal', '_is_tuple': True, 'items': [1]}
     assert serialize(value, wire_format='v2') == fixture['payload']
     assert deserialize(fixture['payload'], wire_format='v2', safe=True) == value
