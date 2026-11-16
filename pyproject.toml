@@ -31,6 +31,8 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/OrrBin/Jsonic"
+Documentation = "https://github.com/OrrBin/Jsonic/blob/master/README.md"
+Changelog = "https://github.com/OrrBin/Jsonic/blob/master/CHANGELOG.md"
 Issues = "https://github.com/OrrBin/Jsonic/issues"
 
 [tool.setuptools.packages.find]
