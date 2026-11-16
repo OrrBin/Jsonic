@@ -8,11 +8,28 @@ with explicit policies for trust, types and persistence. Supports dataclasses,
 annotated classes, mixed dictionary/slot storage, tuples, sets, enums, UUID,
 datetime, custom codecs and optional Pydantic models.
 
-This checkout is **2.0.0rc1, unpublished release candidate**. PyPI's published 1.0.1 does not
-include the new options below. See [migration notes](MIGRATION.md) before upgrading.
+**Jsonic 2.0** adds explicit policies for typed input and durable JSON storage.
+Read the [release notes](https://github.com/OrrBin/Jsonic/blob/master/CHANGELOG.md)
+and [migration guide](https://github.com/OrrBin/Jsonic/blob/master/MIGRATION.md)
+before upgrading from 1.0.1.
 The supported interpreter range is **Python 3.8–3.13**. Pydantic is optional:
 v1 (>=1.10.13) and v2 are covered independently. Versions outside that Python
 range require further qualification and are excluded by package metadata.
+
+## What changed in 2.0
+
+- Opt-in strict typed input validates supported schemas without coercion.
+- Opt-in v2 transport preserves literal dictionaries containing metadata-looking keys.
+- UUID strings and Pydantic canonical-field persistence support explicit round trips.
+- Constructor defaults, frozen invariants, combined flags, inherited slots,
+  traversal options and error paths have corrected behavior.
+- Input preservation, registry-only safe decoding, stable codec IDs and
+  package/platform/dependency checks have dedicated regression coverage.
+
+This major version also narrows Python support, enforces exact root type checks,
+rejects ambiguous codec registrations and makes field filtering consistent.
+See the migration guide for observable changes. Existing legacy wire defaults
+remain available; new persistence formats require compatible readers.
 
 ## Install and develop
 
@@ -20,7 +37,7 @@ Install the published package with `python -m pip install py-jsonic`. To use
 this checkout, run `python -m pip install .`; add `[pydantic]` for optional model
 support. For development, use an isolated environment and
 `python -m pip install -r requirements-dev.txt`. There are no mandatory runtime
-dependencies. [RELEASE.md](RELEASE.md) describes package checks and support policy.
+dependencies. [RELEASE.md](https://github.com/OrrBin/Jsonic/blob/master/RELEASE.md) describes package checks and support policy.
 
 ## Basic persistence
 
@@ -64,7 +81,7 @@ else:
     raise AssertionError('invalid field accepted')
 ```
 
-See [validation modes](VALIDATION_MODES.md) for unions, containers, defaults,
+See [validation modes](https://github.com/OrrBin/Jsonic/blob/master/VALIDATION_MODES.md) for unions, containers, defaults,
 unknown fields and the supported annotation subset. Native Pydantic validation
 is separate from this mode.
 
@@ -95,7 +112,7 @@ wire = serialize(value, wire_format='v2')
 assert deserialize(wire, wire_format='v2', safe=True) == value
 ```
 
-[Wire format and migration](WIRE_FORMAT.md) explains versioned node kinds,
+[Wire format and migration](https://github.com/OrrBin/Jsonic/blob/master/WIRE_FORMAT.md) explains versioned node kinds,
 shape validation, custom codec responsibilities and old-reader limitations.
 Legacy mode remains available for existing data; v2 output requires a new reader.
 
@@ -136,7 +153,7 @@ assert deserialize(serialize(Decimal('1.25')), expected_type=Decimal,
 
 Registration takes a Python type, not a string. Stable IDs are opt-in;
 explicit aliases let new readers accept historical IDs. Collision registrations
-are rejected. [Resolver documentation](RESOLVERS.md) covers public signatures,
+are rejected. [Resolver documentation](https://github.com/OrrBin/Jsonic/blob/master/RESOLVERS.md) covers public signatures,
 recursive traversal and structured errors.
 
 ## Pydantic and UUID persistence
@@ -157,7 +174,7 @@ Pydantic presentation output remains the default and follows native serializers
 and aliases; arbitrary presentation output need not be reversible. Opt-in
 field-state persistence supports documented unique string aliases and runs
 normal validators on reading. Use `uuid_format='string'` for portable UUID
-output. [Persistence policies](PERSISTENCE.md) describes frozen invariants,
+output. [Persistence policies](https://github.com/OrrBin/Jsonic/blob/master/PERSISTENCE.md) describes frozen invariants,
 required InitVar rejection and both new formats' reader requirements.
 
 ## Verification and contribution
@@ -167,9 +184,9 @@ tests an installed wheel outside the checkout, checks historical reader/writer
 compatibility and executes the examples below. It never publishes a release.
 Coverage is measured and uploaded per job, without a static percentage promise.
 
-- [Testing guide and historical coverage audit](TESTING.md)
-- [Runnable example scripts](examples/) and [integration recipes](EXAMPLES.md)
-- [Contributing](CONTRIBUTING.md), [roadmap](ROADMAP.md), [release notes](CHANGELOG.md)
+- [Testing guide and historical coverage audit](https://github.com/OrrBin/Jsonic/blob/master/TESTING.md)
+- [Runnable example scripts](https://github.com/OrrBin/Jsonic/tree/master/examples) and [integration recipes](https://github.com/OrrBin/Jsonic/blob/master/EXAMPLES.md)
+- [Contributing](https://github.com/OrrBin/Jsonic/blob/master/CONTRIBUTING.md), [roadmap](https://github.com/OrrBin/Jsonic/blob/master/ROADMAP.md), [release notes](https://github.com/OrrBin/Jsonic/blob/master/CHANGELOG.md)
 - [Report an issue](https://github.com/OrrBin/Jsonic/issues)
 
-MIT license; see [LICENSE](LICENSE).
+MIT license; see [LICENSE](https://github.com/OrrBin/Jsonic/blob/master/LICENSE).

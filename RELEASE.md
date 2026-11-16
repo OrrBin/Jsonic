@@ -1,12 +1,14 @@
 # Build, support and release policy
 
-## Release candidate and support
+## Version and support
 
-This checkout is `2.0.0rc1`, an unpublished release candidate. The official
-[PyPI metadata](https://pypi.org/pypi/py-jsonic/json) checked on 16 November 2026
-reports latest `1.0.1` with `Requires-Python: >=3.6`. We do not reuse that release
-number or claim the new API is already published. A major release candidate
-accounts for stricter behavior and the explicitly narrowed interpreter range.
+Version `2.0.0` is prepared from the published
+[2.0.0rc1 candidate](https://pypi.org/project/py-jsonic/2.0.0rc1/), uploaded on
+16 November 2026. The candidate already contains the new 2.0 APIs. The stable
+preparation updates metadata and documentation; runtime behavior is unchanged.
+The major line accounts for stricter behavior and the narrowed interpreter range.
+Check the [PyPI release history](https://pypi.org/project/py-jsonic/#history)
+for publication status; a repository version alone does not establish an upload.
 
 The declared range is Python **3.8 through 3.13**, matching the CI matrix.
 Python 3.6/3.7 and newer unqualified interpreters are excluded explicitly.
@@ -58,5 +60,4 @@ No workflow publishes to PyPI or creates a release. Before a stable release,
 review MIGRATION.md against the final code, select/verify the final version
 against PyPI, verify the matrix on the exact release commit, inspect artifacts,
 and obtain explicit authorization to publish. A CI run passing on a branch is
-not evidence that a package has been released. This policy addresses #17 and
-the CI requirement remaining in testing umbrella #25.
+not evidence that a package has been released. This policy documents the release qualification implemented for #17 and #25.
