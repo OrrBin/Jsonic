@@ -46,7 +46,7 @@ class User:
 
 user = User("Alice", "alice@example.com", datetime.now())
 json_data = serialize(user)  # Dict or JSON string
-user_copy = deserialize(json_data, expected_type=User)  # Type-safe!
+user_copy = deserialize(json_data, expected_type=User)  # Checks root type; see strict field validation below
 ```
 
 ---
@@ -54,7 +54,7 @@ user_copy = deserialize(json_data, expected_type=User)  # Type-safe!
 ## ✨ Features
 
 - 🎯 **Zero Configuration** - Works with dataclasses, type hints, and regular classes
-- 🔒 **Type Safe** - Full type hint support with validation
+- 🔒 **Typed input** - Opt-in strict field validation; default checks root types
 - 🚀 **Modern Python** - Built for Python 3.8+ with dataclasses and type hints
 - 📦 **Rich Types** - Supports tuples, sets, enums, datetime, `__slots__`, and more
 - 🎨 **Flexible** - Custom serializers, transient fields, private attribute control
@@ -443,7 +443,7 @@ user = User(name="Alice", email="alice@example.com", age=30, display_name="Ally"
 data = serialize(user)  # Respects field aliases
 
 # Deserialize to Pydantic models
-user_copy = deserialize(data, expected_type=User)  # Full validation
+user_copy = deserialize(data, expected_type=User)  # Native Pydantic validation
 ```
 
 **Pydantic features supported:**
@@ -589,3 +589,11 @@ Inspired by the Python community's need for simple, Pythonic serialization that 
 ---
 
 **Made with ❤️ for the Python community**
+
+### Strict field validation
+
+Annotations do not validate fields during ordinary dataclass decoding. Use
+`deserialize(data, expected_type=YourClass, validation="strict", safe=True)`
+for the supported typed-input subset. See [validation modes](VALIDATION_MODES.md)
+for containers, unions, unknown fields and limitations. Use the
+[collision-free v2 wire format](WIRE_FORMAT.md) for literal metadata-looking dictionaries.
