@@ -1,6 +1,6 @@
-# Migration from published 1.0.1 to the 2.0 development line
+# Migration from published 1.0.1 to 2.0.0rc1
 
-This is an unreleased major development line; nothing has been published.
+This is an unpublished major release candidate. No package has been uploaded.
 
 ## Observable changes requiring review
 

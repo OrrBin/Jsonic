@@ -1,4 +1,19 @@
-# Unreleased
+# 2.0.0rc1 — release candidate (unpublished)
+
+Prepared 16 November 2026. This candidate packages the merged remediation and
+testing work for review; it has not been uploaded to PyPI or TestPyPI.
+
+- Breaking changes include Python 3.8–3.13 support boundaries, exact root type
+  checks, codec collision rejection, consistent filtering, restored slot fields,
+  stricter immutable/constructor behavior and revised diagnostics.
+- Additive options include registry-only safe decoding, strict typed input,
+  collision-free v2 transport, stable codec IDs, UUID strings and Pydantic
+  field-state persistence. Legacy wire defaults remain available.
+- Build qualification includes wheel/sdist clean installs, historical payloads,
+  executed documentation and the Python/Pydantic/platform CI matrix.
+- Review MIGRATION.md before upgrading from published 1.0.1. Circular-reference
+  ignoring (#1) remains deferred; cycles are rejected.
+
 
 ## F09 — explicit Pydantic field-state persistence (#11)
 

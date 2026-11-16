@@ -8,7 +8,7 @@ with explicit policies for trust, types and persistence. Supports dataclasses,
 annotated classes, mixed dictionary/slot storage, tuples, sets, enums, UUID,
 datetime, custom codecs and optional Pydantic models.
 
-This checkout is **2.0.0.dev0, unreleased**. PyPI's published 1.0.1 does not
+This checkout is **2.0.0rc1, unpublished release candidate**. PyPI's published 1.0.1 does not
 include the new options below. See [migration notes](MIGRATION.md) before upgrading.
 The supported interpreter range is **Python 3.8–3.13**. Pydantic is optional:
 v1 (>=1.10.13) and v2 are covered independently. Versions outside that Python
