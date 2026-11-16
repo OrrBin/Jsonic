@@ -72,11 +72,13 @@ def test_explicitly_reversible_validation_alias_choices(kind):
     assert deserialize(serialize(original), expected_type=Aliased, safe=True) == original
 
 
-@pytest.mark.xfail(strict=True, raises=pydantic.ValidationError, reason='F09/#11: asymmetric validation/serialization aliases do not roundtrip')
-def test_asymmetric_aliases_are_not_mistaken_for_a_reversible_codec():
+def test_asymmetric_aliases_roundtrip_in_explicit_persistence_mode():
     if not hasattr(pydantic, 'AliasChoices'):
         pytest.skip('asymmetric aliases are a Pydantic v2 API')
     class Aliased(pydantic.BaseModel):
         value: int = pydantic.Field(validation_alias='input', serialization_alias='output')
     original = Aliased(input=7)
-    assert deserialize(serialize(original), expected_type=Aliased, safe=True) == original
+    assert serialize(original)['output'] == 7
+    with pytest.raises(pydantic.ValidationError):
+        deserialize(serialize(original), expected_type=Aliased, safe=True)
+    assert deserialize(serialize(original, pydantic_mode='roundtrip'), expected_type=Aliased, safe=True) == original

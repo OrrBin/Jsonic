@@ -3,6 +3,7 @@ import argparse
 from datetime import datetime, timezone
 import json
 import sys
+from uuid import UUID
 
 import jsonic
 from jsonic import deserialize, serialize, register_jsonic_type, jsonic_serializer, jsonic_deserializer
@@ -25,12 +26,14 @@ def value_for(name):
         'tuple': (1, 'x'), 'set': {7},
         'datetime': datetime(2026, 11, 15, 12, 34, 56, 123456, tzinfo=timezone.utc),
         'complex': complex(-3, 4), 'record': Record(7), 'color': Color.RED,
+        'uuid': UUID(int=7),
         'flags': Permission.READ, 'combined_flags': Permission.READ | Permission.WRITE,
         'stable': RenamedValue(7), 'alias': RenamedValue(7), 'moved': OldValue(7),
     }[name]
 
 
 def describe(value):
+    if isinstance(value, UUID): return {'uuid': str(value), 'is_safe': value.is_safe.name}
     if isinstance(value, (Record, RenamedValue, OldValue)):
         return {'type': type(value).__name__, 'value': value.value}
     if isinstance(value, (Color, Permission)):

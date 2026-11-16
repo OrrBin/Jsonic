@@ -16,7 +16,8 @@ from jsonic.pydantic_support import (
     is_pydantic_model,
     is_pydantic_class,
     serialize_pydantic_model,
-    deserialize_pydantic_model
+    deserialize_pydantic_model,
+    split_pydantic_type_tag
 )
 
 SERIALIZED_TYPE_ATTRIBUTE_NAME = '_serialized_type'
@@ -119,7 +120,7 @@ class Serializable:
         register_jsonic_type(cls, cls.transient_attributes, cls.init_parameters_mapping)
 
 
-def serialize(obj, serialize_private_attributes=False, string_output=False, include=None, exclude=None, *, uuid_format=None):
+def serialize(obj, serialize_private_attributes=False, string_output=False, include=None, exclude=None, *, uuid_format=None, pydantic_mode=None):
     """
      Serializes ``class instance`` / ``dict`` / ``list`` / ``other python type`` into ``dictionary`` / ``json string`` representing the input
 
@@ -129,6 +130,8 @@ def serialize(obj, serialize_private_attributes=False, string_output=False, incl
         string_output: serialize into json string or ``dict`` / ``list
         include: optional list/set of field names to include (only these fields will be serialized)
         exclude: optional list/set of field names to exclude (these fields will not be serialized)
+        uuid_format: 'legacy' (default) or opt-in portable 'string' representation
+        pydantic_mode: 'presentation' (default) or opt-in canonical-field 'roundtrip' format
 
     Returns:
         ``dictionary`` / ``json string`` representing the input
@@ -141,8 +144,11 @@ def serialize(obj, serialize_private_attributes=False, string_output=False, incl
     uuid_format = context.uuid_format if uuid_format is None else uuid_format
     if uuid_format not in ('legacy', 'string'):
         raise ValueError("uuid_format must be 'legacy' or 'string'")
+    pydantic_mode = context.pydantic_mode if pydantic_mode is None else pydantic_mode
+    if pydantic_mode not in ('presentation', 'roundtrip'):
+        raise ValueError("pydantic_mode must be 'presentation' or 'roundtrip'")
     selection = _FieldSelection(include, exclude)
-    context_token = _traversal.set(replace(context, uuid_format=uuid_format))
+    context_token = _traversal.set(replace(context, uuid_format=uuid_format, pydantic_mode=pydantic_mode))
     token = _selection.set(selection)
     try:
         obj = _handle_serialization_error(
@@ -311,7 +317,13 @@ def _validate_safe_payload(obj, allowed, path=""):
     elif isinstance(obj, dict):
         tag = obj.get(SERIALIZED_TYPE_ATTRIBUTE_NAME)
         if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj:
-            if not isinstance(tag, str) or tag not in allowed:
+            base, persistence = tag, False
+            if isinstance(tag, str) and tag not in _JsonicDeserializer.deserializers:
+                base, persistence = split_pydantic_type_tag(tag)
+            authorized = isinstance(base, str) and base in allowed
+            if persistence:
+                authorized = authorized and is_pydantic_class(allowed[base])
+            if not authorized:
                 raise DeserializationError(f"Type tag is not registered for safe decoding: {tag!r}", path)
         for marker, name in (("_is_tuple", "tuple"), ("_is_set", "set")):
             if obj.get(marker):
@@ -342,6 +354,7 @@ def _payload_type(obj, expected):
         raise DeserializationError("Type tag must be a string")
     if tag in _JsonicDeserializer.types:
         return _JsonicDeserializer.types[tag]
+    tag, _ = split_pydantic_type_tag(tag)
     if tag in Serializable.jsonic_types:
         return Serializable.jsonic_types[tag].cls
     # Identity cannot be resolved safely from a module name. Compare the name
@@ -480,9 +493,10 @@ def _serialize_object(obj, serialize_private_attributes=False, path=""):
     if is_pydantic_model(obj):
         selection = _selection.get() or _FieldSelection()
         pydantic_dict = serialize_pydantic_model(obj, serialize_private_attributes,
-                                                 selection.include, selection.exclude)
+                                                 selection.include, selection.exclude,
+                                                 persistence=current_context().pydantic_mode == 'roundtrip')
         result = _serialize_fields(pydantic_dict, pydantic_dict.__getitem__, serialize_private_attributes, path, filter_private=False)
-        result[SERIALIZED_TYPE_ATTRIBUTE_NAME] = full_type_name(typ)
+        result[SERIALIZED_TYPE_ATTRIBUTE_NAME] = pydantic_dict[SERIALIZED_TYPE_ATTRIBUTE_NAME]
         return result
 
     # Check if it's an Enum
@@ -722,7 +736,7 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
     if SERIALIZED_TYPE_ATTRIBUTE_NAME not in obj:
         raise DeserializationError(f'Deserializing dict of jsonic type but could not find {SERIALIZED_TYPE_ATTRIBUTE_NAME} attribute', path)
 
-    type_name = obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
+    type_name, persistence = split_pydantic_type_tag(obj[SERIALIZED_TYPE_ATTRIBUTE_NAME])
     is_jsonic_type = type_name in Serializable.jsonic_types
     if expected_type and full_type_name(expected_type) != type_name:
         raise DeserializationError(f'Deserializing type {type_name}, which is not the expected type: {expected_type}', path)
@@ -730,7 +744,9 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
 
     # Check if it's a Pydantic model
     if is_pydantic_class(cls):
-        return deserialize_pydantic_model(obj, cls)
+        return deserialize_pydantic_model(obj, cls, persistence=persistence)
+    if persistence:
+        raise DeserializationError('Pydantic persistence tag requires a Pydantic model', path)
 
     # Check if it's an Enum
     if isinstance(cls, type) and issubclass(cls, Enum):

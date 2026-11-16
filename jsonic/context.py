@@ -9,6 +9,7 @@ class TraversalContext:
     serialize_private_attributes: bool = False
     deserialize_private_attributes: bool = False
     uuid_format: str = 'legacy'
+    pydantic_mode: str = 'presentation'
 
     def child_path(self, key):
         if isinstance(key, int):

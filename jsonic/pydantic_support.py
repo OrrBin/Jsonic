@@ -18,6 +18,31 @@ except ImportError:
     BaseModel = None
 
 
+PYDANTIC_FIELDS_PREFIX = 'jsonic:pydantic:fields-v1:'
+
+
+def split_pydantic_type_tag(tag):
+    if isinstance(tag, str) and tag.startswith(PYDANTIC_FIELDS_PREFIX):
+        return tag[len(PYDANTIC_FIELDS_PREFIX):], True
+    return tag, False
+
+
+def _field_input_aliases(cls):
+    """The persistence format supports unambiguous string input aliases."""
+    if getattr(cls, '__pydantic_root_model__', False) or getattr(cls, '__custom_root_type__', False):
+        raise ValueError('Pydantic roundtrip mode does not support root models')
+    fields = cls.model_fields if PYDANTIC_V2 else cls.__fields__
+    aliases = {}
+    for name, field in fields.items():
+        alias = getattr(field, 'validation_alias', None) or field.alias or name
+        if not isinstance(alias, str):
+            raise ValueError(f'Pydantic roundtrip mode requires a string validation alias for field {name!r}')
+        if alias in aliases.values():
+            raise ValueError('Pydantic roundtrip mode requires unique validation aliases')
+        aliases[name] = alias
+    return aliases
+
+
 def is_pydantic_model(obj: Any) -> bool:
     """
     Check if an object is a Pydantic BaseModel instance.
@@ -82,7 +107,7 @@ def _dump_selector(obj, paths):
 
 
 def serialize_pydantic_model(obj: Any, serialize_private_attributes: bool = False,
-                             include=None, exclude=None) -> dict:
+                             include=None, exclude=None, persistence=False) -> dict:
     """
     Serialize a Pydantic model to a dictionary.
     
@@ -102,6 +127,23 @@ def serialize_pydantic_model(obj: Any, serialize_private_attributes: bool = Fals
         that will be handled by Jsonic's preprocessing step.
         Field aliases are respected (by_alias=True).
     """
+    if persistence:
+        from jsonic.decorators import _JsonicDeserializer
+        from jsonic.util import full_type_name
+        aliases = _field_input_aliases(type(obj))
+        extras = (getattr(obj, '__pydantic_extra__', None) if PYDANTIC_V2
+                  else set(vars(obj)) - set(aliases))
+        if extras:
+            raise ValueError('Pydantic roundtrip mode does not support extra stored attributes')
+        tag = PYDANTIC_FIELDS_PREFIX + full_type_name(type(obj))
+        if tag in _JsonicDeserializer.deserializers:
+            raise ValueError('Pydantic persistence type tag conflicts with a custom codec')
+        # Canonical fields retain raw nested models/types; the normal Jsonic
+        # traversal handles them. Presentation serializers/computed fields do
+        # not define persisted constructor state.
+        data = {name: getattr(obj, name) for name in aliases}
+        data['_serialized_type'] = tag
+        return data
     # Use appropriate method based on Pydantic version
     if PYDANTIC_V2:
         # Pydantic V2: use model_dump with mode='python' and by_alias=True
@@ -120,7 +162,7 @@ def serialize_pydantic_model(obj: Any, serialize_private_attributes: bool = Fals
     return data
 
 
-def deserialize_pydantic_model(data: dict, cls: Type) -> Any:
+def deserialize_pydantic_model(data: dict, cls: Type, persistence=False) -> Any:
     """
     Deserialize a dictionary to a Pydantic model.
     
@@ -140,8 +182,16 @@ def deserialize_pydantic_model(data: dict, cls: Type) -> Any:
     """
     from jsonic.context import current_context
     context = current_context()
-    clean_data = {key: context.deserialize(value, key) for key, value in data.items()
-                  if key != '_serialized_type'}
+    if persistence:
+        aliases = _field_input_aliases(cls)
+        unknown = set(data) - set(aliases) - {'_serialized_type'}
+        if unknown:
+            raise ValueError('Pydantic persistence payload contains unknown canonical fields')
+        clean_data = {aliases[key]: context.deserialize(value, key) for key, value in data.items()
+                      if key != '_serialized_type'}
+    else:
+        clean_data = {key: context.deserialize(value, key) for key, value in data.items()
+                      if key != '_serialized_type'}
 
     # Use appropriate method based on Pydantic version
     if PYDANTIC_V2:

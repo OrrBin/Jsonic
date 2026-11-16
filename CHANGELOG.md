@@ -1,5 +1,22 @@
 # Unreleased
 
+## F09 — explicit Pydantic field-state persistence (#11)
+
+`serialize(..., pydantic_mode='roundtrip')` writes canonical field names and a
+versioned Pydantic type tag. Readers translate supported string input aliases
+before normal Pydantic validation; nested models retain their own tags and
+container types. The default presentation mode still uses existing output
+aliases and native dump serializers. Persistence mode reads declared raw fields
+and skips presentation serializers/computed output. It supports unique string
+validation aliases; alias choices/paths, root models and extra stored attributes
+are explicitly rejected rather than guessed. Normal validators still run and
+arbitrary/non-idempotent user transformations are not promised reversible.
+
+The new mode is opt-in and is a new format requiring an updated reader. Existing
+wire output is unchanged. Selection uses canonical names in persistence mode;
+safe decoding still requires authorization of every nested model. No package
+release or default-format switch is included.
+
 ## F10 — constructor defaults, frozen fields and UUIDs (#12)
 
 Generic/Serializable and type-hinted reconstruction share missing/defaulted
