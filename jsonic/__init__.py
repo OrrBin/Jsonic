@@ -1,5 +1,6 @@
 from .serializable import Serializable, register_jsonic_type, serialize, deserialize
 from .decorators import jsonic_serializer, jsonic_deserializer
+from .context import TraversalContext
 from .default_serializers import *
 
 # Register type resolvers

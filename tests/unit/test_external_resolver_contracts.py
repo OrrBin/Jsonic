@@ -66,7 +66,6 @@ def test_resolver_exception_preserves_path_and_source_state():
     assert vars(source) == {'value': 4}
 
 
-@pytest.mark.xfail(strict=True, raises=SerializationError, reason='F14/#16: dispatcher disagrees with declared public resolver signature')
 def test_minimal_public_protocol_resolver():
     class PublicResolver(ExternalResolver):
         def serialize(self, obj): return {'value': obj.value}

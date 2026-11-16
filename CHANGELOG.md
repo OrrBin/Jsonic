@@ -1,5 +1,18 @@
 # Unreleased
 
+## F14 — executable resolver protocol (#16)
+
+The dispatcher supports the documented one-payload serializer and the legacy
+two-argument private-field serializer. Resolvers may opt into a keyword-only
+TraversalContext on serialization/deserialization. Signature binding happens
+before invocation; a TypeError raised inside user code is never retried.
+TraversalContext is exported from jsonic and supplies immutable options/path
+plus serialize/deserialize child helpers. Decoder data is already recursively
+decoded; callbacks should not decode it a second time. Priority/tie behavior
+and default wire representations are unchanged. Opaque/non-inspectable callables
+retain historical two-argument invocation. Callbacks return the documented
+mapping/instance shapes.
+
 ## F13 — complete adapter error paths (#15)
 
 Dataclass/type-hinted extraction, registered/resolver reconstruction, Pydantic

@@ -16,11 +16,24 @@ class TraversalContext:
 
     def serialize(self, value, key):
         """Serialize a child with inherited selection, options and type policy."""
-        from jsonic.serializable import _preprocess_for_serialization, _handle_serialization_error
+        from jsonic.serializable import _preprocess_for_serialization, _handle_serialization_error, _selection
         path = self.child_path(key)
-        return _handle_serialization_error(
-            lambda: _preprocess_for_serialization(value, self.serialize_private_attributes, path), path
-        )
+        token = None
+        selection = _selection.get()
+        if not isinstance(key, int) and selection is not None:
+            child = selection.child(key)
+            if child is None:
+                # The dispatcher's output filtering removes this field. Do not
+                # traverse a value whose selector already excludes it.
+                return None
+            token = _selection.set(child)
+        try:
+            return _handle_serialization_error(
+                lambda: _preprocess_for_serialization(value, self.serialize_private_attributes, path), path
+            )
+        finally:
+            if token is not None:
+                _selection.reset(token)
 
     def deserialize(self, value, key):
         """Decode a child without relaxing the active safe-mode policy."""
