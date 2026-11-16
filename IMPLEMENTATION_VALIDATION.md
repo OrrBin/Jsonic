@@ -19,16 +19,29 @@ Pydantic models and datetime/UUID transformations have documented separate paths
 
 ## Verification
 
-The first complete candidate passed 997 artifact-enabled cases with no skips,
-expected failures or unexpected failures. An additional 22 malformed-input and
-policy/error cases were added before the final run; final results are recorded
-below after verification. Prior baseline: 941 passed, 1 strict expected failure.
+The final artifact-enabled Python 3.12.11 / Pydantic 2.11.3 run passes
+**1,019 tests, zero skips, zero expected failures, zero unexpected failures**.
+The merged baseline had 942 cases (941 passed, one expected failure): this
+batch adds 77 collected cases and converts the final expected failure into a
+passing opt-in v2 contract. Legacy wire defaults are intentionally unchanged.
 
-Local matrix covers macOS Python 3.8/3.12/3.13 and Pydantic v1/v2/absent.
-The package checker successfully inspected and installed both wheel and sdist
-in a clean environment outside the checkout, with no runtime dependencies.
+| Python | Pydantic | Passed | Skipped | Expected failures |
+| --- | --- | ---: | ---: | ---: |
+| 3.12.11 | 2.11.3, explicit artifact checks | 1,019 | 0 | 0 |
+| 3.8.20 | 2.10.6 | 1,016 | 3 artifact-input skips | 0 |
+| 3.13.5 | 2.14.3 | 1,016 | 3 artifact-input skips | 0 |
+| 3.13.5 | 1.10.27 | 1,009 | 10 version/artifact skips | 0 |
+| 3.13.5 | absent | 933 | 41 dependency/artifact skips | 0 |
+
+The local matrix is macOS. Pydantic v2 has one existing deprecated-validator
+warning. The package checker inspected and installed both final wheel and
+sdist in a clean environment outside the checkout, with no runtime dependencies.
 15 documentation snippets/scripts execute with Pydantic; 11 execute without it.
 Historical reader checks include a positive legacy control and negative v2
-control. No static coverage threshold or cross-platform result is inferred
-from those local runs. The committed GitHub workflow supplies the additional
-Python versions and selected Windows/macOS jobs; remote results are separate.
+control. Coverage is measured, not asserted from test counts.
+
+The first GitHub run exposed an infrastructure issue: ubuntu-latest moved to
+26.04, whose setup-python manifest lacks 3.8/3.9. CI now pins Ubuntu 22.04,
+Windows 2022 and macOS 15, with current action versions. Remote run results
+are recorded separately after the corrected workflow completes. No local
+result is presented as Windows/Linux evidence.
