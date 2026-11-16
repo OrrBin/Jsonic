@@ -405,7 +405,7 @@ def deserialize(obj, deserialize_private_attributes=None, string_input=False,
             if not isinstance(obj, str):
                 raise DeserializationError('string_input requires str')
             obj = json.loads(obj)
-        return structure(obj, expected_type, unknown_fields, _path or '', safe=safe)
+        return structure(obj, expected_type, unknown_fields, current_context().path if _path is None else _path, safe=safe)
     if unknown_fields != 'forbid':
         raise ValueError('unknown_fields applies only to strict validation')
     context = current_context()

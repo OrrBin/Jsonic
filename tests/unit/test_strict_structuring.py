@@ -288,3 +288,24 @@ def test_cyclic_python_input_rejected_before_schema_recursion():
     with pytest.raises(DeserializationError) as error:
         strict(value, Node)
     assert error.value.code == 'circular_reference'
+
+
+def test_strict_input_in_custom_decoder_inherits_parent_path():
+    from jsonic import jsonic_deserializer
+    class Box:
+        pass
+    @jsonic_deserializer(Box)
+    def decode(data):
+        return strict(data, Dict[str, int])
+    with pytest.raises(DeserializationError) as error:
+        deserialize({'nested': {'_serialized_type': 'Box', 'age': 'bad'}}, safe=True)
+    assert error.value.path == 'nested.age'
+
+
+def test_nested_schema_constructor_calls_inherit_their_path():
+    class Record:
+        def __init__(self, age: int):
+            deserialize('bad', expected_type=int)
+    with pytest.raises(DeserializationError) as error:
+        strict([{'age': 1}], List[Record], safe=True)
+    assert error.value.path == '[0]'
