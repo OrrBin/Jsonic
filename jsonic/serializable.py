@@ -2,6 +2,8 @@ import importlib
 import inspect
 import json
 from contextvars import ContextVar
+from dataclasses import replace
+from jsonic.context import _traversal, current_context
 from enum import Enum, Flag
 from typing import List, Dict
 
@@ -232,7 +234,18 @@ def _handle_deserialization_error(func, path):
         raise DeserializationError(str(e), path)
 
 
-def _preprocess_for_serialization(obj, serialize_private_attributes=False, path=""):
+def _preprocess_for_serialization(obj, serialize_private_attributes=None, path=None):
+    context = current_context()
+    private = context.serialize_private_attributes if serialize_private_attributes is None else serialize_private_attributes
+    path = context.path if path is None else path
+    token = _traversal.set(replace(context, path=path, serialize_private_attributes=private))
+    try:
+        return _preprocess_impl(obj, private, path)
+    finally:
+        _traversal.reset(token)
+
+
+def _preprocess_impl(obj, serialize_private_attributes=False, path=""):
     """Recursively preprocess all objects for serialization."""
     # Handle primitives
     if obj is None or isinstance(obj, (bool, int, float, str)):
@@ -301,7 +314,25 @@ def _payload_type(obj, expected):
     return expected if tag == full_type_name(expected) else None
 
 
-def deserialize(obj, deserialize_private_attributes=False, string_input=False,
+def deserialize(obj, deserialize_private_attributes=None, string_input=False,
+                expected_type=None, _path=None, *, safe=None):
+    """Decode data; omitted private-field options inherit the active traversal.
+
+    Use safe=True for externally supplied data. Safe decoding only reconstructs
+    explicitly authorized classes/codecs; legacy decoding is for trusted data.
+    Root expected_type uses exact identity and does not validate field values.
+    """
+    context = current_context()
+    private = context.deserialize_private_attributes if deserialize_private_attributes is None else deserialize_private_attributes
+    path = context.path if _path is None else _path
+    token = _traversal.set(replace(context, path=path, deserialize_private_attributes=private))
+    try:
+        return _deserialize_with_policy(obj, private, string_input, expected_type, path, safe=safe)
+    finally:
+        _traversal.reset(token)
+
+
+def _deserialize_with_policy(obj, deserialize_private_attributes=False, string_input=False,
                 expected_type=None, _path="", *, safe=None):
     """Decode Jsonic data.
 
