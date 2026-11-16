@@ -10,6 +10,7 @@ class TraversalContext:
     deserialize_private_attributes: bool = False
     uuid_format: str = 'legacy'
     pydantic_mode: str = 'presentation'
+    wire_format: str = 'legacy'
 
     def child_path(self, key):
         if isinstance(key, int):

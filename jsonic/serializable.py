@@ -9,6 +9,7 @@ from enum import Enum, Flag
 from typing import List, Dict
 from uuid import UUID
 
+from jsonic.wire import LiteralDict
 from jsonic.decorators import _JsonicSerializer, _JsonicDeserializer
 from jsonic.util import full_type_name, is_private_attribute
 from jsonic.exceptions import SerializationError, DeserializationError
@@ -48,7 +49,7 @@ class EnumEncoder(json.JSONEncoder):
         active.add(identity)
         try:
             if isinstance(obj, dict):
-                return {key: self._convert_enums(value, active) for key, value in obj.items()}
+                return type(obj)((key, self._convert_enums(value, active)) for key, value in obj.items())
             if isinstance(obj, list):
                 return [self._convert_enums(value, active) for value in obj]
             return tuple(self._convert_enums(value, active) for value in obj)
@@ -120,7 +121,7 @@ class Serializable:
         register_jsonic_type(cls, cls.transient_attributes, cls.init_parameters_mapping)
 
 
-def serialize(obj, serialize_private_attributes=False, string_output=False, include=None, exclude=None, *, uuid_format=None, pydantic_mode=None):
+def serialize(obj, serialize_private_attributes=False, string_output=False, include=None, exclude=None, *, uuid_format=None, pydantic_mode=None, wire_format=None):
     """
      Serializes ``class instance`` / ``dict`` / ``list`` / ``other python type`` into ``dictionary`` / ``json string`` representing the input
 
@@ -147,8 +148,11 @@ def serialize(obj, serialize_private_attributes=False, string_output=False, incl
     pydantic_mode = context.pydantic_mode if pydantic_mode is None else pydantic_mode
     if pydantic_mode not in ('presentation', 'roundtrip'):
         raise ValueError("pydantic_mode must be 'presentation' or 'roundtrip'")
+    wire_format = context.wire_format if wire_format is None else wire_format
+    if wire_format not in ('legacy', 'v2'):
+        raise ValueError("wire_format must be 'legacy' or 'v2'")
     selection = _FieldSelection(include, exclude)
-    context_token = _traversal.set(replace(context, uuid_format=uuid_format, pydantic_mode=pydantic_mode))
+    context_token = _traversal.set(replace(context, uuid_format=uuid_format, pydantic_mode=pydantic_mode, wire_format=wire_format))
     token = _selection.set(selection)
     try:
         obj = _handle_serialization_error(
@@ -157,6 +161,11 @@ def serialize(obj, serialize_private_attributes=False, string_output=False, incl
     finally:
         _selection.reset(token)
         _traversal.reset(context_token)
+
+    if wire_format == 'v2':
+        from jsonic.wire import envelope
+        # Normalize enums returned directly by custom codecs before tagging nodes.
+        obj = envelope(EnumEncoder()._convert_enums(obj))
 
     # Use custom encoder that handles nested enums
     json_str = json.dumps(obj, cls=EnumEncoder)
@@ -187,13 +196,13 @@ class _FieldSelection:
         return _FieldSelection(None if self.include is None or '' in inc else inc, exc)
 
 
-def _serialize_fields(names, getter, private=False, path=None, transient=(), filter_private=True):
+def _serialize_fields(names, getter, private=False, path=None, transient=(), filter_private=True, literal=False):
     """Select a field before reading or traversing its value."""
     selection = _selection.get() or _FieldSelection()
     path = current_context().path if path is None else path
     result = {}
     for key in names:
-        if key == SERIALIZED_TYPE_ATTRIBUTE_NAME:
+        if key == SERIALIZED_TYPE_ATTRIBUTE_NAME and not literal:
             continue
         if filter_private and not private and key.startswith('_'):
             continue
@@ -219,12 +228,12 @@ def _apply_field_filter(data, include=None, exclude=None, path=""):
         return [_apply_field_filter(v, include, exclude) for v in data]
     if not isinstance(data, dict):
         return data
-    if data.get('_is_tuple') or data.get('_is_set'):
+    if not isinstance(data, LiteralDict) and (data.get('_is_tuple') or data.get('_is_set')):
         return {**data, 'items': _apply_field_filter(data['items'], include, exclude)}
     selection = _FieldSelection(include, exclude)
-    result = {}
+    result = LiteralDict() if isinstance(data, LiteralDict) else {}
     for key, value in data.items():
-        if key == SERIALIZED_TYPE_ATTRIBUTE_NAME:
+        if key == SERIALIZED_TYPE_ATTRIBUTE_NAME and not isinstance(data, LiteralDict):
             result[key] = value
             continue
         child = selection.child(key)
@@ -300,7 +309,9 @@ def _preprocess_impl(obj, serialize_private_attributes=False, path=""):
     
     # A dictionary's private-looking keys are ordinary user data.
     if isinstance(obj, dict):
-        result = _serialize_fields(obj, obj.__getitem__, serialize_private_attributes, path, filter_private=False)
+        result = _serialize_fields(obj, obj.__getitem__, serialize_private_attributes, path, filter_private=False, literal=current_context().wire_format == 'v2')
+        if current_context().wire_format == 'v2':
+            return LiteralDict(result)
         if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj:
             result[SERIALIZED_TYPE_ATTRIBUTE_NAME] = obj[SERIALIZED_TYPE_ATTRIBUTE_NAME]
         return result
@@ -314,6 +325,9 @@ def _validate_safe_payload(obj, allowed, path=""):
     if isinstance(obj, list):
         for i, value in enumerate(obj):
             _validate_safe_payload(value, allowed, f"{path}[{i}]")
+    elif isinstance(obj, LiteralDict):
+        for key, value in obj.items():
+            _validate_safe_payload(value, allowed, f"{path}.{key}" if path else str(key))
     elif isinstance(obj, dict):
         tag = obj.get(SERIALIZED_TYPE_ATTRIBUTE_NAME)
         if SERIALIZED_TYPE_ATTRIBUTE_NAME in obj:
@@ -341,6 +355,8 @@ def _check_expected_type(actual, expected, path):
 
 def _payload_type(obj, expected):
     """Identify a root type without input-directed imports or callback execution."""
+    if isinstance(obj, LiteralDict):
+        return dict
     if not isinstance(obj, dict):
         return type(obj)
     if obj.get('_is_tuple'):
@@ -363,13 +379,19 @@ def _payload_type(obj, expected):
 
 
 def deserialize(obj, deserialize_private_attributes=None, string_input=False,
-                expected_type=None, _path=None, *, safe=None):
+                expected_type=None, _path=None, *, safe=None, wire_format='legacy'):
     """Decode data; omitted private-field options inherit the active traversal.
 
     Use safe=True for externally supplied data. Safe decoding only reconstructs
     explicitly authorized classes/codecs; legacy decoding is for trusted data.
     Root expected_type uses exact identity and does not validate field values.
     """
+    if wire_format not in ('legacy', 'v2'):
+        raise ValueError("wire_format must be 'legacy' or 'v2'")
+    if wire_format == 'v2':
+        from jsonic.wire import unpack
+        obj = unpack(json.loads(obj) if string_input else obj)
+        string_input = False
     context = current_context()
     private = context.deserialize_private_attributes if deserialize_private_attributes is None else deserialize_private_attributes
     path = context.path if _path is None else _path
@@ -449,6 +471,8 @@ def _deserialize_impl(obj, deserialize_private_attributes: bool = False, string_
             raise TypeError('deserializing string: string_input requires str')
         return deserialize(json.loads(obj), expected_type=expected_type, deserialize_private_attributes=deserialize_private_attributes, _path=_path)
 
+    if isinstance(obj, LiteralDict):
+        return {key: current_context().deserialize(value, key) for key, value in obj.items()}
     if type(obj) == list:
         return _deserialize_list(obj, expected_type=expected_type, deserialize_private_attributes=deserialize_private_attributes, path=_path)
     elif type(obj) == dict:
@@ -619,7 +643,9 @@ def _deserialize_generic_dict(obj: dict, deserialize_private_attributes: bool = 
 
     for key, value in obj.items():
         key_path = f"{path}.{key}" if path else key
-        if type(value) == dict and (SERIALIZED_TYPE_ATTRIBUTE_NAME in value or value.get('_is_tuple') or value.get('_is_set')):
+        if isinstance(value, LiteralDict):
+            deserialized_dict[key] = current_context().deserialize(value, key)
+        elif type(value) == dict and (SERIALIZED_TYPE_ATTRIBUTE_NAME in value or value.get('_is_tuple') or value.get('_is_set')):
             deserialized_dict[key] = _handle_deserialization_error(
                 lambda: deserialize(value, deserialize_private_attributes=deserialize_private_attributes, _path=key_path),
                 key_path

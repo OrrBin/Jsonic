@@ -1,0 +1,38 @@
+{
+  "provenance": "Jsonic v2 format introduced for issue #13; literal dictionary with legacy metadata keys",
+  "payload": {
+    "_serialized_type": "jsonic:wire:v2",
+    "version": 2,
+    "payload": [
+      "dict",
+      [
+        [
+          "_serialized_type",
+          [
+            "value",
+            "literal"
+          ]
+        ],
+        [
+          "_is_tuple",
+          [
+            "value",
+            true
+          ]
+        ],
+        [
+          "items",
+          [
+            "list",
+            [
+              [
+                "value",
+                1
+              ]
+            ]
+          ]
+        ]
+      ]
+    ]
+  }
+}

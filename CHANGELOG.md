@@ -149,3 +149,13 @@ The policy is call-local and follows recursive calls through legacy adapters.
 The legacy default still dynamically imports classes and is only suitable for
 trusted stored data. Safe mode is additive; changing the default is reserved
 for a major release. No wire format changes are made.
+
+## F11 — collision-free dictionaries (#13)
+
+Add explicit `wire_format='v2'` on serialization and decoding. Versioned node
+kinds distinguish literal dictionaries from adapter metadata, including literal
+dictionaries that imitate the v2 envelope itself. Complete shapes and duplicate
+keys are validated before reconstruction. Default legacy wire contracts remain
+unchanged. V2 requires a new reader; see WIRE_FORMAT.md for migration and custom
+codec responsibilities. This is additive opt-in functionality, not a default
+wire-format replacement.
