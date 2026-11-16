@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68,<76", "wheel>=0.41,<1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "py-jsonic"
+version = "2.0.0.dev0"
+description = "JSON persistence and explicit typed input for Python objects"
+readme = "README.md"
+requires-python = ">=3.8,<3.14"
+license = {file = "LICENSE"}
+authors = [{name = "Orr Benyamini", email = "orrbenyamini@gmail.com"}]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.optional-dependencies]
+pydantic = ["pydantic>=1.10.13,<3"]
+dev = [
+    "pytest>=7,<10", "pytest-cov>=4,<7", "pytest-benchmark>=4,<6",
+    "hypothesis>=6,<7", "build>=1,<2", "twine>=5,<7",
+]
+
+[project.urls]
+Homepage = "https://github.com/OrrBin/Jsonic"
+Issues = "https://github.com/OrrBin/Jsonic/issues"
+
+[tool.setuptools.packages.find]
+include = ["jsonic", "jsonic.*"]
+exclude = ["tests", "tests.*"]

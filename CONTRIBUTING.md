@@ -28,7 +28,7 @@ Thank you for your interest in contributing to Jsonic! This document provides gu
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.8–3.13
 - Git
 - pip
 
@@ -45,7 +45,7 @@ cd jsonic
 3. Add upstream remote:
 
 ```bash
-git remote add upstream https://github.com/ORIGINAL_OWNER/jsonic.git
+git remote add upstream https://github.com/OrrBin/Jsonic.git
 ```
 
 ---
@@ -200,7 +200,7 @@ git checkout -b fix/your-bug-fix
 Branch naming conventions:
 - `feature/` - New features
 - `fix/` - Bug fixes
-- `docs/` - Documentation changes
+- root Markdown files and `examples/` - Documentation changes
 - `refactor/` - Code refactoring
 - `test/` - Test additions or changes
 
@@ -220,7 +220,7 @@ pytest tests/
 # Check coverage
 pytest tests/ --cov=jsonic
 
-# Ensure coverage is >95%
+# Inspect measured line and branch coverage
 ```
 
 ### 4. Commit Your Changes
@@ -337,7 +337,7 @@ Any other relevant information.
 1. **Discuss First**: Open an issue to discuss the feature before implementing
 2. **Write Tests**: Add comprehensive tests for the new feature
 3. **Update Docs**: Update README.md, EXAMPLES.md, and docstrings
-4. **Maintain Coverage**: Ensure test coverage stays >95%
+4. **Maintain Coverage**: Add meaningful regression cases and inspect measured branch coverage
 5. **No Breaking Changes**: Avoid breaking existing APIs
 
 ### Writing Tests
@@ -472,3 +472,10 @@ Contributors will be:
 ---
 
 Thank you for contributing to Jsonic! 🎉
+
+## Current verification workflow
+
+Use `python -m pip install -r requirements-dev.txt`; metadata and developer
+dependencies live in pyproject.toml. Follow RELEASE.md to reproduce CI, package
+inspection, fresh installation, historical fixtures and executed documentation.
+No local test result alone establishes a release.

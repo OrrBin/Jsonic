@@ -6,7 +6,7 @@ which is useful for mapping Python snake_case to JSON camelCase
 or other naming conventions required by APIs.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from jsonic import serialize, deserialize
 from typing import List, Optional
 
@@ -189,8 +189,8 @@ def example_5_roundtrip():
     try:
         invalid_data = {"userId": "not-a-number", "firstName": "Test", "lastName": "User", 
                        "email": "test@example.com", "address": {}}
-        deserialize(invalid_data, expected_type=User)
-    except Exception as e:
+        User(**invalid_data)
+    except ValidationError as e:
         print(f"  Validation error caught: {type(e).__name__}")
 
 

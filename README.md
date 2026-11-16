@@ -1,150 +1,28 @@
 # Jsonic
 
-### Decoding externally supplied data
+[![Tests and packages](https://github.com/OrrBin/Jsonic/actions/workflows/tests.yml/badge.svg)](https://github.com/OrrBin/Jsonic/actions/workflows/tests.yml)
+[![PyPI](https://badge.fury.io/py/py-jsonic.svg)](https://pypi.org/project/py-jsonic/)
 
-For API requests, uploaded configuration, and message queues, use
-`deserialize(payload, safe=True)`. Register every trusted reconstructed class
-with `register_jsonic_type(MyClass)` (subclassing `Serializable` registers it
-automatically). An explicit `expected_type=MyClass` authorizes that class for
-the call; nested classes still need registration. Unknown tags are rejected
-before any reconstruction runs, including tags inside tuples, sets, and
-Pydantic models. Custom decoders and registered constructors are trusted code
-and may have side effects; registration is not a sandbox.
+Serialize Python objects to JSON-compatible trees or text, and reconstruct them
+with explicit policies for trust, types and persistence. Supports dataclasses,
+annotated classes, mixed dictionary/slot storage, tuples, sets, enums, UUID,
+datetime, custom codecs and optional Pydantic models.
 
-The backward-compatible default `deserialize(payload)` permits dynamic module
-imports and constructors selected by the payload. Use it only for trusted data.
-Safe mode does not provide field validation or resource limits.
+This checkout is **2.0.0.dev0, unreleased**. PyPI's published 1.0.1 does not
+include the new options below. See [migration notes](MIGRATION.md) before upgrading.
+The supported interpreter range is **Python 3.8–3.13**. Pydantic is optional:
+v1 (>=1.10.13) and v2 are covered independently. Versions outside that Python
+range require further qualification and are excluded by package metadata.
 
-See [resolver compatibility and traversal context](RESOLVERS.md) for custom
-resolver signatures, inherited child traversal and structured error details.
-See [persistence policies](PERSISTENCE.md) for constructor defaults, frozen
-dataclasses, UUID formats and opt-in Pydantic field-state round trips.
+## Install and develop
 
-Field selectors apply to each member of root and nested collections. Exclusion
-wins if `include` and `exclude` overlap, at every nesting level. Excluded fields
-are skipped before built-in traversal. Selectors use dots as path separators;
-literal dotted keys have no escape syntax. Custom codecs control their own
-extraction, so filtering cannot prevent work performed inside those callbacks.
+Install the published package with `python -m pip install py-jsonic`. To use
+this checkout, run `python -m pip install .`; add `[pydantic]` for optional model
+support. For development, use an isolated environment and
+`python -m pip install -r requirements-dev.txt`. There are no mandatory runtime
+dependencies. [RELEASE.md](RELEASE.md) describes package checks and support policy.
 
-[![PyPI version](https://badge.fury.io/py/py-jsonic.svg)](https://badge.fury.io/py/py-jsonic)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-448%20passing-brightgreen.svg)](tests/)
-
-**Jsonic** is a lightweight, Pythonic library for effortless JSON serialization and deserialization of Python objects. Built for modern Python with type hints, dataclasses, and developer experience in mind.
-
-```python
-from jsonic import serialize, deserialize
-from dataclasses import dataclass
-from datetime import datetime
-
-@dataclass
-class User:
-    name: str
-    email: str
-    created_at: datetime
-
-user = User("Alice", "alice@example.com", datetime.now())
-json_data = serialize(user)  # Dict or JSON string
-user_copy = deserialize(json_data, expected_type=User)  # Checks root type; see strict field validation below
-```
-
----
-
-## ✨ Features
-
-- 🎯 **Zero Configuration** - Works with dataclasses, type hints, and regular classes
-- 🔒 **Typed input** - Opt-in strict field validation; default checks root types
-- 🚀 **Modern Python** - Built for Python 3.8+ with dataclasses and type hints
-- 📦 **Rich Types** - Supports tuples, sets, enums, datetime, `__slots__`, and more
-- 🎨 **Flexible** - Custom serializers, transient fields, private attribute control
-- 🔍 **Partial Serialization** - Include/exclude fields with nested dot notation
-- 🤝 **Pydantic Integration** - Seamless support for Pydantic models and field aliases
-- 🐛 **Great Errors** - Detailed error messages with exact path to the problem
-- ⚡ **Fast** - Minimal overhead, optimized for performance
-- 🧪 **Well Tested** - 448 tests with >95% coverage
-
----
-
-## 📦 Installation
-
-```bash
-pip install py-jsonic
-```
-
-**Requirements:** Python 3.8+
-
----
-
-## 🚀 Quick Start
-
-### Basic Usage
-
-```python
-from jsonic import serialize, deserialize
-from dataclasses import dataclass
-
-@dataclass
-class Product:
-    name: str
-    price: float
-    in_stock: bool
-
-# Serialize to dict
-product = Product("Laptop", 999.99, True)
-data = serialize(product)
-# {'name': 'Laptop', 'price': 999.99, 'in_stock': True, '_serialized_type': 'Product'}
-
-# Deserialize back to object
-product_copy = deserialize(data, expected_type=Product)
-assert product.name == product_copy.name
-```
-
-### With Nested Objects
-
-```python
-from dataclasses import dataclass
-from typing import List
-
-@dataclass
-class Address:
-    street: str
-    city: str
-
-@dataclass
-class User:
-    name: str
-    addresses: List[Address]
-
-user = User("Bob", [Address("123 Main St", "NYC")])
-data = serialize(user)
-user_copy = deserialize(data, expected_type=User)
-```
-
-### JSON String Output
-
-```python
-json_string = serialize(user, string_output=True)
-user_copy = deserialize(json_string, string_input=True, expected_type=User)
-```
-
----
-
-## 📚 Core Concepts
-
-### Supported Types
-
-Jsonic automatically handles:
-
-- **Primitives**: `int`, `float`, `str`, `bool`, `None`
-- **Collections**: `list`, `dict`, `tuple`, `set`
-- **Standard Library**: `datetime`, `Enum`, `UUID`
-- **Python Classes**: dataclasses, classes with type hints, `__slots__`
-- **Custom Types**: Via `@jsonic_serializer` and `@jsonic_deserializer`
-
-### Three Ways to Use Jsonic
-
-#### 1. Dataclasses (Recommended)
+## Basic persistence
 
 ```python
 from dataclasses import dataclass
@@ -155,445 +33,143 @@ class Person:
     name: str
     age: int
 
-person = Person("Alice", 30)
-data = serialize(person)
+person = Person('Alice', 30)
+wire = serialize(person, string_output=True)
+restored = deserialize(wire, string_input=True, expected_type=Person, safe=True)
+assert restored == person
 ```
 
-#### 2. Serializable Base Class
+`expected_type` normally checks exact root identity. Dataclass annotations alone
+**do not validate fields**. For plain typed input, explicitly enable strict
+validation, which validates before constructing schema objects and does not
+coerce values:
 
 ```python
-from jsonic import Serializable
-from datetime import datetime
-
-class User(Serializable):
-    def __init__(self, username: str, created_at: datetime):
-        super().__init__()
-        self.username = username
-        self.created_at = created_at
-
-user = User("alice", datetime.now())
-data = serialize(user)
-```
-
-#### 3. Register External Classes
-
-```python
-from jsonic import register_jsonic_type
-
-class ThirdPartyClass:
-    def __init__(self, value: str):
-        self.internal_value = value
-
-# Register with parameter mapping
-register_jsonic_type(
-    ThirdPartyClass,
-    init_parameters_mapping={'value': 'internal_value'}
-)
-```
-
----
-
-## 🎯 Common Use Cases
-
-### API Responses
-
-```python
-@dataclass
-class APIResponse:
-    status: str
-    data: dict
-    timestamp: datetime
-
-response = APIResponse("success", {"user_id": 123}, datetime.now())
-return serialize(response, string_output=True)
-```
-
-### Database Models
-
-```python
-@dataclass
-class BlogPost:
-    title: str
-    content: str
-    author: User
-    tags: List[str]
-    published_at: datetime
-
-# Save to database
-post_json = serialize(post, string_output=True)
-db.save(post_json)
-
-# Load from database
-post_data = db.load()
-post = deserialize(post_data, string_input=True, expected_type=BlogPost)
-```
-
-### Configuration Files
-
-```python
-@dataclass
-class AppConfig:
-    database_url: str
-    api_keys: dict
-    features: List[str]
-
-# Load config
-with open('config.json') as f:
-    config = deserialize(json.load(f), expected_type=AppConfig)
-```
-
-### Microservices Communication
-
-```python
-@dataclass
-class OrderEvent:
-    order_id: str
-    items: List[Product]
-    total: float
-    created_at: datetime
-
-# Send event
-event = OrderEvent("ORD-123", products, 299.99, datetime.now())
-message_queue.publish(serialize(event, string_output=True))
-
-# Receive event
-data = message_queue.consume()
-event = deserialize(data, string_input=True, expected_type=OrderEvent)
-```
-
----
-
-## 🔧 Advanced Features
-
-### Partial Serialization
-
-Control which fields to serialize with `include` and `exclude` parameters:
-
-```python
-@dataclass
-class User:
-    username: str
-    email: str
-    password_hash: str
-    api_token: str
-
-user = User("alice", "alice@example.com", "hash123", "token456")
-
-# Exclude sensitive fields
-safe_data = serialize(user, exclude={'password_hash', 'api_token'})
-# Result: {'username': 'alice', 'email': 'alice@example.com', ...}
-
-# Include only specific fields
-public_data = serialize(user, include={'username', 'email'})
-# Result: {'username': 'alice', 'email': 'alice@example.com', ...}
-```
-
-**Nested field filtering** with dot notation:
-
-```python
-@dataclass
-class Credentials:
-    username: str
-    password: str
+from dataclasses import dataclass
+from typing import List
+from jsonic import deserialize
+from jsonic.exceptions import DeserializationError
 
 @dataclass
-class Database:
-    host: str
-    credentials: Credentials
+class Person:
+    age: int
 
-@dataclass
-class Config:
-    app_name: str
-    database: Database
-
-config = Config("MyApp", Database("localhost", Credentials("admin", "secret")))
-
-# Exclude nested password field
-safe_config = serialize(config, exclude={'database.credentials.password'})
-# Password is excluded, but username remains
-
-# Include only specific nested fields
-public_config = serialize(config, include={'app_name', 'database.host'})
-# Only app_name and database.host are included
-```
-
-**Filter fields in lists:**
-
-```python
-@dataclass
-class Item:
-    name: str
-    price: float
-    internal_cost: float
-
-@dataclass
-class Order:
-    order_id: str
-    items: List[Item]
-
-order = Order("ORD-123", [Item("Widget", 10.0, 5.0)])
-
-# Exclude internal_cost from all items
-public_order = serialize(order, exclude={'items.internal_cost'})
-```
-
-### Transient Attributes
-
-Exclude fields from serialization at the class level:
-
-```python
-class User(Serializable):
-    transient_attributes = ['password_hash', '_cache']
-    
-    def __init__(self, username: str, password_hash: str):
-        super().__init__()
-        self.username = username
-        self.password_hash = password_hash  # Won't be serialized
-        self._cache = {}  # Won't be serialized
-```
-
-### Private Attributes
-
-Control private attribute serialization:
-
-```python
-# Exclude private attributes (default)
-data = serialize(obj, serialize_private_attributes=False)
-
-# Include private attributes
-data = serialize(obj, serialize_private_attributes=True)
-```
-
-### Custom Serializers
-
-```python
-from jsonic import jsonic_serializer, jsonic_deserializer
-from decimal import Decimal
-
-@jsonic_serializer(Decimal)
-def serialize_decimal(obj: Decimal) -> dict:
-    return {'value': str(obj), '_serialized_type': 'Decimal'}
-
-@jsonic_deserializer('Decimal')
-def deserialize_decimal(data: dict) -> Decimal:
-    return Decimal(data['value'])
-```
-
-### Type Safety
-
-```python
-# Validates the deserialized type matches expected type
-user = deserialize(data, expected_type=User)
-
-# Raises error if type doesn't match
+assert deserialize([{'age': 30}], expected_type=List[Person],
+                   validation='strict', safe=True) == [Person(30)]
 try:
-    product = deserialize(user_data, expected_type=Product)
-except TypeError as e:
-    print(f"Type mismatch: {e}")
+    deserialize({'age': 'bad'}, expected_type=Person, validation='strict')
+except DeserializationError as error:
+    assert error.path == 'age' and error.code == 'type_mismatch'
+else:
+    raise AssertionError('invalid field accepted')
 ```
 
-### Enums
+See [validation modes](VALIDATION_MODES.md) for unions, containers, defaults,
+unknown fields and the supported annotation subset. Native Pydantic validation
+is separate from this mode.
+
+## Trust and externally supplied data
+
+For API requests, uploaded configuration and message queues, use `safe=True`.
+Register trusted classes with `register_jsonic_type(MyClass)` or subclass
+`Serializable`. An explicit concrete root `expected_type` authorizes that class;
+nested tagged classes still need registration. Unknown tags are rejected before
+reconstruction, including under Pydantic models and tuple/set adapters.
+Strict typed input instead selects classes from the caller's explicit schema;
+see its policy details in VALIDATION_MODES.md.
+
+Registered constructors and codecs are trusted application code. Safe decoding
+is not a sandbox and does not impose resource limits. The legacy default permits
+payload-directed dynamic imports and must be restricted to trusted stored data.
+
+## Literal dictionaries and wire compatibility
+
+Default legacy output can confuse literal metadata-looking dictionary keys
+with object tags. Use the explicit v2 writer **and reader** for new data that
+needs collision-free dictionaries:
 
 ```python
-from enum import Enum
-
-class Status(Enum):
-    PENDING = "pending"
-    APPROVED = "approved"
-    REJECTED = "rejected"
-
-@dataclass
-class Request:
-    status: Status
-
-request = Request(Status.APPROVED)
-data = serialize(request)  # Handles enums automatically
+from jsonic import serialize, deserialize
+value = {'_serialized_type': 'literal', '_is_tuple': True, 'items': [1]}
+wire = serialize(value, wire_format='v2')
+assert deserialize(wire, wire_format='v2', safe=True) == value
 ```
 
-### Tuples and Sets
+[Wire format and migration](WIRE_FORMAT.md) explains versioned node kinds,
+shape validation, custom codec responsibilities and old-reader limitations.
+Legacy mode remains available for existing data; v2 output requires a new reader.
+
+## Selection and attributes
 
 ```python
-@dataclass
-class Data:
-    coordinates: tuple  # (x, y, z)
-    unique_ids: set
-
-data = Data((1.0, 2.0, 3.0), {1, 2, 3})
-serialized = serialize(data)  # Preserves tuple and set types
-restored = deserialize(serialized, expected_type=Data)
-assert isinstance(restored.coordinates, tuple)
-assert isinstance(restored.unique_ids, set)
+from jsonic import serialize
+value = [{'name': 'Alice', 'password': 'secret'}]
+assert serialize(value, exclude={'password'}) == [{'name': 'Alice'}]
 ```
 
-### Pydantic Models
+Selection applies to every member of root and nested collections. Exclusion
+wins at every nesting level, and built-in extraction skips excluded values
+before traversal. Dots are path separators with no literal-dot escape syntax.
+Private object attributes are excluded by default; literal dictionary keys are
+user data. `Serializable.transient_attributes` and `init_parameters_mapping`
+control persistence for registered classes. Custom callbacks own their internal
+attribute access and mutation. Jsonic protects its input mappings but passes
+nested values to custom decoders with shallow-copy identity semantics.
 
-Jsonic seamlessly integrates with Pydantic models:
+## Custom codecs
+
+```python
+from decimal import Decimal
+from jsonic import serialize, deserialize, jsonic_serializer, jsonic_deserializer
+
+@jsonic_serializer(Decimal, type_id='example:decimal:v1')
+def encode_decimal(value):
+    return {'value': str(value)}
+
+@jsonic_deserializer(Decimal, type_id='example:decimal:v1')
+def decode_decimal(data):
+    return Decimal(data['value'])
+
+assert deserialize(serialize(Decimal('1.25')), expected_type=Decimal,
+                   safe=True) == Decimal('1.25')
+```
+
+Registration takes a Python type, not a string. Stable IDs are opt-in;
+explicit aliases let new readers accept historical IDs. Collision registrations
+are rejected. [Resolver documentation](RESOLVERS.md) covers public signatures,
+recursive traversal and structured errors.
+
+## Pydantic and UUID persistence
 
 ```python
 from pydantic import BaseModel, Field
+from jsonic import serialize, deserialize
 
-class User(BaseModel):
-    name: str
-    email: str
-    age: int = Field(ge=0, le=150)
-    nickname: str = Field(alias="display_name")
+class Invoice(BaseModel):
+    amount: int = Field(alias='inputAmount')
 
-# Serialize Pydantic models
-user = User(name="Alice", email="alice@example.com", age=30, display_name="Ally")
-data = serialize(user)  # Respects field aliases
-
-# Deserialize to Pydantic models
-user_copy = deserialize(data, expected_type=User)  # Native Pydantic validation
+value = Invoice(inputAmount=7)
+wire = serialize(value, pydantic_mode='roundtrip')
+assert deserialize(wire, expected_type=Invoice, safe=True) == value
 ```
 
-**Pydantic features supported:**
-- Auto-detection of Pydantic models
-- Field aliases (`alias`, `validation_alias`, `serialization_alias`)
-- Nested Pydantic models
-- Pydantic validators run on deserialization
+Pydantic presentation output remains the default and follows native serializers
+and aliases; arbitrary presentation output need not be reversible. Opt-in
+field-state persistence supports documented unique string aliases and runs
+normal validators on reading. Use `uuid_format='string'` for portable UUID
+output. [Persistence policies](PERSISTENCE.md) describes frozen invariants,
+required InitVar rejection and both new formats' reader requirements.
 
----
+## Verification and contribution
 
-## 🐛 Error Handling
+CI runs the Python/dependency matrix, builds and inspects wheel/sdist packages,
+tests an installed wheel outside the checkout, checks historical reader/writer
+compatibility and executes the examples below. It never publishes a release.
+Coverage is measured and uploaded per job, without a static percentage promise.
 
-Jsonic provides detailed error messages with exact paths:
+- [Testing guide and historical coverage audit](TESTING.md)
+- [Runnable example scripts](examples/) and [integration recipes](EXAMPLES.md)
+- [Contributing](CONTRIBUTING.md), [roadmap](ROADMAP.md), [release notes](CHANGELOG.md)
+- [Report an issue](https://github.com/OrrBin/Jsonic/issues)
 
-```python
-@dataclass
-class Address:
-    street: str
-    city: str
-
-@dataclass  
-class User:
-    name: str
-    address: Address
-
-# Error shows exact location
-try:
-    data = {'name': 'Alice', 'address': {'street': 123}}  # Wrong type
-    user = deserialize(data, expected_type=User)
-except Exception as e:
-    print(e)
-    # DeserializationError: Type mismatch at path: obj.address.street
-```
-
-### Type Not Found Suggestions
-
-```python
-try:
-    deserialize({'_serialized_type': 'Usr'})  # Typo
-except TypeError as e:
-    print(e)
-    # Could not find type: Usr
-    # Did you mean one of these?
-    #   - User
-    #   - UserProfile
-```
-
----
-
-## 📊 Comparison with Alternatives
-
-| Feature | Jsonic | Pydantic | marshmallow | dataclasses-json |
-|---------|--------|----------|-------------|------------------|
-| Zero config for dataclasses | ✅ | ✅ | ❌ | ✅ |
-| Type hints support | ✅ | ✅ | ⚠️ | ✅ |
-| Pydantic integration | ✅ | N/A | ❌ | ❌ |
-| Partial serialization | ✅ | ⚠️ | ⚠️ | ❌ |
-| Nested field filtering | ✅ | ❌ | ❌ | ❌ |
-| Validation | ⚠️ | ✅ | ✅ | ❌ |
-| Tuples/Sets support | ✅ | ⚠️ | ❌ | ❌ |
-| `__slots__` support | ✅ | ❌ | ❌ | ❌ |
-| Custom serializers | ✅ | ✅ | ✅ | ⚠️ |
-| Error messages with paths | ✅ | ✅ | ⚠️ | ❌ |
-| Learning curve | Low | Medium | High | Low |
-| Performance | Fast | Fast | Medium | Fast |
-
-**When to use Jsonic:**
-- You want simple, Pythonic serialization without schemas
-- You're working with existing classes you can't modify
-- You need `__slots__`, tuples, or sets support
-- You want great error messages out of the box
-- You need fine-grained control over serialization (include/exclude nested fields)
-- You want to work with both dataclasses and Pydantic models
-
-**When to use alternatives:**
-- **Pydantic**: You need extensive validation and FastAPI integration (but Jsonic can serialize Pydantic models!)
-- **marshmallow**: You need complex validation rules and transformations
-- **dataclasses-json**: You only need basic dataclass serialization
-
----
-
-## 🎓 Examples
-
-See [EXAMPLES.md](EXAMPLES.md) for comprehensive examples including:
-- Real-world API integration
-- Database persistence patterns
-- Microservices communication
-- Configuration management
-- Migration from other libraries
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
-- Development setup
-- Running tests
-- Code style guidelines
-- Pull request process
-
----
-
-## 📝 Documentation
-
-- **[Examples](EXAMPLES.md)** - Real-world usage examples
-- **[API Reference](docs/)** - Detailed API documentation
-- **[Roadmap](ROADMAP.md)** - Planned features and timeline
-- **[Contributing](CONTRIBUTING.md)** - How to contribute
-
----
-
-## 🐛 Known Limitations
-
-Jsonic is designed for data classes and may not work with:
-
-- **Classes with temporary constructor parameters** - Parameters not stored as attributes
-- **Classes with positional-only parameters** - Can't reconstruct with keyword args
-- **Classes with complex `*args`/`**kwargs`** - May not deserialize correctly
-- **Classes with side effects in `__init__`** - May behave differently on deserialization
-
-For these cases, consider using custom serializers or restructuring your classes.
-
----
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
----
-
-## 🙏 Acknowledgments
-
-Inspired by the Python community's need for simple, Pythonic serialization that "just works" with modern Python features.
-
----
-
-## 📮 Support
-
-- **Issues**: [GitHub Issues](https://github.com/yourusername/jsonic/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/jsonic/discussions)
-- **Email**: orrbenyamini@gmail.com
-
----
-
-**Made with ❤️ for the Python community**
-
-### Strict field validation
-
-Annotations do not validate fields during ordinary dataclass decoding. Use
-`deserialize(data, expected_type=YourClass, validation="strict", safe=True)`
-for the supported typed-input subset. See [validation modes](VALIDATION_MODES.md)
-for containers, unions, unknown fields and limitations. Use the
-[collision-free v2 wire format](WIRE_FORMAT.md) for literal metadata-looking dictionaries.
+MIT license; see [LICENSE](LICENSE).

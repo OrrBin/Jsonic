@@ -1,6 +1,10 @@
 # Jsonic Examples
 
-Comprehensive examples for common use cases and patterns.
+Application integration recipes for common patterns. These snippets often require
+caller-provided variables, external services or optional libraries; they are
+illustrative, not end-to-end tested integrations. For executed examples and the
+current API contracts, see README.md, examples/, VALIDATION_MODES.md and
+WIRE_FORMAT.md. Annotations alone do not validate fields in normal decoding.
 
 ## Table of Contents
 
