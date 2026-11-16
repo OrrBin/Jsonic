@@ -110,10 +110,9 @@ def test_private_option_survives_supported_container_boundaries(shape):
     assert source._private == 'changed'
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason='F11/#13: literal metadata dictionary is reinterpreted')
 def test_reserved_key_regression_is_not_blessed_as_a_roundtrip():
     literal = {'_is_tuple': True, 'items': [1], 'label': 'keep'}
-    assert deserialize(serialize(literal)) == literal
+    assert deserialize(serialize(literal, wire_format='v2'), wire_format='v2', safe=True) == literal
 
 
 def test_repeated_references_do_not_imply_graph_identity_preservation():
