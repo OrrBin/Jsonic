@@ -167,9 +167,10 @@ class _FieldSelection:
         return _FieldSelection(None if self.include is None or '' in inc else inc, exc)
 
 
-def _serialize_fields(names, getter, private=False, path="", transient=(), filter_private=True):
+def _serialize_fields(names, getter, private=False, path=None, transient=(), filter_private=True):
     """Select a field before reading or traversing its value."""
     selection = _selection.get() or _FieldSelection()
+    path = current_context().path if path is None else path
     result = {}
     for key in names:
         if key == SERIALIZED_TYPE_ATTRIBUTE_NAME:
@@ -221,7 +222,7 @@ def _handle_serialization_error(func, path):
     except RecursionError:
         raise ValueError("Circular reference detected during serialization")
     except (TypeError, Exception) as e:
-        raise SerializationError(str(e), path)
+        raise SerializationError(str(e), path) from e
 
 
 def _handle_deserialization_error(func, path):
@@ -231,7 +232,11 @@ def _handle_deserialization_error(func, path):
     except DeserializationError:
         raise
     except (TypeError, AttributeError) as e:
-        raise DeserializationError(str(e), path)
+        # Preserve specialized native/application exception classes, e.g.
+        # FrozenInstanceError, which callers may already catch specifically.
+        if type(e) not in (TypeError, AttributeError):
+            raise
+        raise DeserializationError(str(e), path) from e
 
 
 def _preprocess_for_serialization(obj, serialize_private_attributes=None, path=None):
@@ -289,7 +294,8 @@ def _validate_safe_payload(obj, allowed, path=""):
 
 def _check_expected_type(actual, expected, path):
     if actual is not expected:
-        raise DeserializationError(f"Deserializing type {actual}, which is not the expected type: {expected}", path)
+        raise DeserializationError(f"Deserializing type {actual}, which is not the expected type: {expected}", path,
+                                   code='type_mismatch', expected_type=expected, actual_type=actual)
 
 
 def _payload_type(obj, expected):
@@ -328,6 +334,12 @@ def deserialize(obj, deserialize_private_attributes=None, string_input=False,
     token = _traversal.set(replace(context, path=path, deserialize_private_attributes=private))
     try:
         return _deserialize_with_policy(obj, private, string_input, expected_type, path, safe=safe)
+    except (TypeError, AttributeError) as error:
+        # Keep this boundary inline: extra callback frames per container would
+        # reduce supported nesting depth on older Python versions.
+        if type(error) not in (TypeError, AttributeError):
+            raise
+        raise DeserializationError(str(error), path) from error
     finally:
         _traversal.reset(token)
 
@@ -392,7 +404,7 @@ def _deserialize_impl(obj, deserialize_private_attributes: bool = False, string_
     """
     if string_input:
         if type(obj) != str:
-            raise TypeError(f'deserializing string, but input was not of type str. given input: {obj}')
+            raise TypeError('deserializing string: string_input requires str')
         return deserialize(json.loads(obj), expected_type=expected_type, deserialize_private_attributes=deserialize_private_attributes, _path=_path)
 
     if type(obj) == list:
@@ -703,39 +715,15 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
         from jsonic.type_resolver import get_resolver_for_type
         resolver = get_resolver_for_type(cls)
         if resolver:
-            # Recursively deserialize nested structures first
-            data = {}
-            for key, value in obj.items():
-                if key == SERIALIZED_TYPE_ATTRIBUTE_NAME:
-                    continue
-                elif type(value) == list:
-                    data[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
-                elif type(value) == dict:
-                    if SERIALIZED_TYPE_ATTRIBUTE_NAME in value:
-                        data[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
-                    else:
-                        data[key] = _deserialize_generic_dict(value, deserialize_private_attributes=deserialize_private_attributes)
-                else:
-                    data[key] = value
-            
-            return resolver.deserialize(data, cls)
+            context = current_context()
+            data = {key: context.deserialize(value, key) for key, value in obj.items()
+                    if key != SERIALIZED_TYPE_ATTRIBUTE_NAME}
+            return _handle_deserialization_error(lambda: resolver.deserialize(data, cls), path)
 
-    deserialized_dict = {}
-
-    for key, value in obj.items():
-        if key == SERIALIZED_TYPE_ATTRIBUTE_NAME:
-            pass
-        elif not deserialize_private_attributes and key.startswith('_'):
-            pass
-        elif type(value) == list:
-            deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
-        elif type(value) == dict:
-            if SERIALIZED_TYPE_ATTRIBUTE_NAME in value or value.get('_is_tuple') or value.get('_is_set'):
-                deserialized_dict[key] = deserialize(value, deserialize_private_attributes=deserialize_private_attributes)
-            else:
-                deserialized_dict[key] = _deserialize_generic_dict(value, deserialize_private_attributes=deserialize_private_attributes)
-        else:
-            deserialized_dict[key] = value
+    context = current_context()
+    deserialized_dict = {key: context.deserialize(value, key) for key, value in obj.items()
+                         if key != SERIALIZED_TYPE_ATTRIBUTE_NAME
+                         and (deserialize_private_attributes or not key.startswith('_'))}
 
     init_dict = {}
 
@@ -762,7 +750,8 @@ def _deserialize_jsonic_type_dict(obj: dict, deserialize_private_attributes=Fals
             if parameter_name not in deserialized_dict:
                 raise DeserializationError(f'Missing attribute in given dict to match __init__ parameter: {parameter_name}.\n'
                                      f'If relevant, consider registering type "{type_name}" using "register_jsonic_type" '
-                                     f'and providing required "init_parameters_mapping".', path)
+                                     f'and providing required "init_parameters_mapping".', path,
+                                             code='missing_field', field=parameter_name)
             init_dict[parameter_name] = deserialized_dict[parameter_name]
 
     created_instance = cls(**init_dict)

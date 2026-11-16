@@ -21,7 +21,6 @@ def test_serialization_preserves_exact_path(wrap, path):
     assert str(error.value).endswith('at path: ' + path)
 
 @pytest.mark.parametrize('field', ['inner', 'nested'])
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason='F13/#15: registered-parent decoder drops parent path')
 def test_registered_parent_missing_field_preserves_exact_path(field):
     calls = []
     class Child(Serializable):

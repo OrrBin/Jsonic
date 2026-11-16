@@ -4,8 +4,13 @@
 class JsonicError(Exception):
     """Base exception for Jsonic errors with path context."""
     
-    def __init__(self, message: str, path: str = None):
+    def __init__(self, message: str, path: str = None, *, code=None,
+                 expected_type=None, actual_type=None, field=None):
         self.path = path or ""
+        self.code = code or type(self).__name__
+        self.expected_type = expected_type
+        self.actual_type = actual_type
+        self.field = field
         if self.path:
             message = f"{message}\n  at path: {self.path}"
         super().__init__(message)
