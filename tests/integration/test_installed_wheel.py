@@ -26,16 +26,20 @@ import json, sys
 from pathlib import Path
 from jsonic import serialize, deserialize, register_jsonic_type
 import jsonic
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
-@dataclass
+from uuid import UUID
+@dataclass(frozen=True)
 class Record:
     value: int
     created: datetime
+    identifier: UUID
+    doubled: int = field(init=False)
+    def __post_init__(self): object.__setattr__(self, 'doubled', self.value * 2)
 register_jsonic_type(Record)
-value = Record(7, datetime(2026, 11, 15))
+value = Record(7, datetime(2026, 11, 15), UUID(int=7))
 if sys.argv[1] == 'write':
-    print(serialize(value, string_output=True))
+    print(serialize(value, string_output=True, uuid_format='string'))
 else:
     restored = deserialize(sys.stdin.read(), string_input=True, safe=True)
     assert restored == value

@@ -87,7 +87,7 @@ def test_actual_historical_reader_writer_compatibility(tmp_path, pytestconfig):
     assert process.returncode != 0
     assert str(legacy / 'jsonic/__init__.py') in process.stdout
     assert 'Could not find type: testing:persist:v1' in process.stderr
-    for name in ('primitives', 'tuple', 'set', 'datetime', 'complex', 'record', 'color', 'flags', 'combined_flags'):
+    for name in ('primitives', 'tuple', 'set', 'datetime', 'complex', 'uuid', 'record', 'color', 'flags', 'combined_flags'):
         code, written = worker(tmp_path, 'write', name, library_root=legacy)
         assert code == 0, (name, written)
         assert Path(written['library']).resolve() == legacy / 'jsonic/__init__.py'
@@ -95,3 +95,21 @@ def test_actual_historical_reader_writer_compatibility(tmp_path, pytestconfig):
         assert code == 0, (name, read)
         from tests.support.persistence_worker import describe, value_for
         assert read['value'] == describe(value_for(name)), name
+    try:
+        import pydantic
+    except ImportError:
+        return  # The standard-library historical cases above still ran.
+    from tests.support.pydantic_compatibility import Model
+    from jsonic import serialize, deserialize
+    value = Model(input=7)
+    compatible_env = {**os.environ, 'PYTHONPATH': str(legacy) + os.pathsep + str(ROOT)}
+    presentation = subprocess.run([sys.executable, '-c', script], input=json.dumps(serialize(value)),
+                                  text=True, capture_output=True, cwd=str(tmp_path), env=compatible_env, timeout=15)
+    assert presentation.returncode == 0, presentation.stderr
+    assert str(legacy / 'jsonic/__init__.py') in presentation.stdout
+    persisted = serialize(value, pydantic_mode='roundtrip')
+    assert deserialize(persisted, expected_type=Model, safe=True).value == 7
+    new_format = subprocess.run([sys.executable, '-c', script], input=json.dumps(persisted),
+                                text=True, capture_output=True, cwd=str(tmp_path), env=compatible_env, timeout=15)
+    assert new_format.returncode != 0
+    assert 'Could not find type: jsonic:pydantic:fields-v1:' in new_format.stderr

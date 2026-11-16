@@ -1,5 +1,9 @@
 # Traversal and resolver fixes: validation
 
+This report describes PRs #38–#40, which are now merged. See
+[persistence validation](PERSISTENCE_VALIDATION.md) for the newer constructor
+and Pydantic work and current suite totals.
+
 Validated 16 November 2026 against merged baseline
 `d7534377dd9a174961a5557ffa390681be4f98e2`.
 

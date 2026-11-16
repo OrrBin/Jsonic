@@ -1,6 +1,7 @@
 # Package testing guide and audit results
 
 This is the historical testing-expansion report merged in PRs #32–#37.
+The newest results are in [persistence validation](PERSISTENCE_VALIDATION.md).
 See [the traversal-fix validation report](TRAVERSAL_VALIDATION.md) for the newer
 suite totals and the five expected failures now fixed by #10, #15 and #16.
 

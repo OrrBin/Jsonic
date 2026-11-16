@@ -22,6 +22,8 @@ def constructor_kwargs(cls, data, mapping=None, transient=(), private=True):
             result[name] = data[attribute]
         elif parameter.default is inspect.Parameter.empty:
             if name in mapping:
+                # Keep the historical missing-mapping exception catchable;
+                # the defaulted mapping case above now correctly falls through.
                 raise KeyError(attribute)
             raise DeserializationError(
                 f'Missing attribute in given dict to match __init__ parameter: {name}.\n'

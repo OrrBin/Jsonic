@@ -17,6 +17,8 @@ Safe mode does not provide field validation or resource limits.
 
 See [resolver compatibility and traversal context](RESOLVERS.md) for custom
 resolver signatures, inherited child traversal and structured error details.
+See [persistence policies](PERSISTENCE.md) for constructor defaults, frozen
+dataclasses, UUID formats and opt-in Pydantic field-state round trips.
 
 Field selectors apply to each member of root and nested collections. Exclusion
 wins if `include` and `exclude` overlap, at every nesting level. Excluded fields
