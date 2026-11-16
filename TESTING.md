@@ -1,5 +1,9 @@
 # Package testing guide and audit results
 
+For current CI/build commands, see RELEASE.md. For the latest remaining-issue
+work, see IMPLEMENTATION_VALIDATION.md; the expected-failure table below is
+historical and no longer describes the new branch.
+
 This is the historical testing-expansion report merged in PRs #32–#37.
 The newest results are in [persistence validation](PERSISTENCE_VALIDATION.md).
 See [the traversal-fix validation report](TRAVERSAL_VALIDATION.md) for the newer

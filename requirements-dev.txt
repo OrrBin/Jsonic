@@ -1,5 +1,2 @@
-# Development and testing dependencies
-pytest>=7.0.0
-pytest-cov>=4.0.0
-pytest-benchmark>=4.0.0
-hypothesis>=6.0.0
+# Canonical developer dependencies are maintained in pyproject.toml.
+-e .[dev]

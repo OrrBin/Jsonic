@@ -169,3 +169,14 @@ are rejected unless explicitly ignored; matching class tags are schema-bound,
 not imported. Defaults, frozen invariants, forward references, safe nested calls
 and error paths have dedicated cases. Unsupported schemas fail explicitly.
 Default root-only type checking remains unchanged. See VALIDATION_MODES.md.
+
+## F15 — package and release qualification (#17, #25)
+
+Move metadata to pyproject.toml and mark this checkout 2.0.0.dev0, unreleased.
+Declare Python 3.8–3.13, package-only wheels, optional Pydantic and one developer
+dependency path. Add version/dependency CI plus Windows/macOS boundary coverage,
+wheel/sdist inspection and clean installations, explicit historical/wheel tests,
+measured branch-coverage artifacts and executed documentation/examples. Remove
+unsupported static counts, competitor/performance rankings and placeholder links.
+See RELEASE.md and MIGRATION.md for publication separation and breaking-change
+review. No package is published and no stable version is selected automatically.

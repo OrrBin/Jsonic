@@ -62,7 +62,7 @@ try:
     bad_product = Product(name="Bad", price=-10, tags={"test"})
     print("  ERROR: Should have raised ValidationError!")
 except ValidationError as e:
-    print(f"  ✓ Validation caught: {e.error_count()} error(s)")
+    print(f"  ✓ Validation caught: {len(e.errors())} error(s)")
     print(f"    - {e.errors()[0]['msg']}")
 
 print("\n" + "=" * 60)
@@ -82,7 +82,7 @@ try:
     bad_product = deserialize(bad_data, expected_type=Product)
     print("  ERROR: Should have raised ValidationError!")
 except ValidationError as e:
-    print(f"  ✓ Validation caught: {e.error_count()} error(s)")
+    print(f"  ✓ Validation caught: {len(e.errors())} error(s)")
     print(f"    - Field: {e.errors()[0]['loc'][0]}")
     print(f"    - Error: {e.errors()[0]['msg']}")
 
@@ -99,7 +99,7 @@ try:
     incomplete_product = deserialize(incomplete_data, expected_type=Product)
     print("  ERROR: Should have raised ValidationError!")
 except ValidationError as e:
-    print(f"  ✓ Validation caught: {e.error_count()} error(s)")
+    print(f"  ✓ Validation caught: {len(e.errors())} error(s)")
     print(f"    - Missing field: {e.errors()[0]['loc'][0]}")
 
 # Test 3: Wrong type
@@ -115,7 +115,7 @@ try:
     wrong_product = deserialize(wrong_type_data, expected_type=Product)
     print("  ERROR: Should have raised ValidationError!")
 except ValidationError as e:
-    print(f"  ✓ Validation caught: {e.error_count()} error(s)")
+    print(f"  ✓ Validation caught: {len(e.errors())} error(s)")
     print(f"    - Field: {e.errors()[0]['loc'][0]}")
     print(f"    - Error: {e.errors()[0]['type']}")
 
@@ -129,7 +129,7 @@ try:
     bad_order = deserialize(order_data, expected_type=Order)
     print("  ERROR: Should have raised ValidationError!")
 except ValidationError as e:
-    print(f"  ✓ Validation caught: {e.error_count()} error(s)")
+    print(f"  ✓ Validation caught: {len(e.errors())} error(s)")
     print(f"    - Location: {'.'.join(str(x) for x in e.errors()[0]['loc'])}")
     print(f"    - Error: {e.errors()[0]['msg']}")
 
@@ -137,7 +137,7 @@ print("\n" + "=" * 60)
 print("✅ All tests passed!")
 print("=" * 60)
 print("\nKey Takeaways:")
-print("  1. Jsonic preserves set types (unlike Pydantic alone)")
+print("  1. Jsonic reconstructs sets and native Pydantic validation runs")
 print("  2. Pydantic validation works during deserialization")
 print("  3. Invalid data is caught with clear error messages")
 print("  4. Works with nested models and complex structures")

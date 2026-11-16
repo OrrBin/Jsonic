@@ -1,0 +1,10 @@
+include *.md
+include requirements*.txt
+recursive-include examples *.py
+recursive-include scripts *.py
+recursive-include tests *.py *.json
+recursive-include .github/workflows *.yml
+prune .git
+prune .venv
+prune build
+prune dist

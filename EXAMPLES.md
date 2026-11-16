@@ -1,6 +1,10 @@
 # Jsonic Examples
 
-Comprehensive examples for common use cases and patterns.
+Application integration recipes for common patterns. These snippets often require
+caller-provided variables, external services or optional libraries; they are
+illustrative, not end-to-end tested integrations. For executed examples and the
+current API contracts, see README.md, examples/, VALIDATION_MODES.md and
+WIRE_FORMAT.md. Annotations alone do not validate fields in normal decoding.
 
 ## Table of Contents
 
@@ -1104,7 +1108,7 @@ def serialize_decimal(obj: Decimal) -> dict:
         '_serialized_type': 'Decimal'
     }
 
-@jsonic_deserializer('Decimal')
+@jsonic_deserializer(Decimal)
 def deserialize_decimal(data: dict) -> Decimal:
     return Decimal(data['value'])
 
@@ -1304,7 +1308,7 @@ class Product:
 
 ### 3. Use expected_type for Safety
 ```python
-# Type-safe deserialization
+# Root-type-checked deserialization (field validation is opt-in)
 user = deserialize(data, expected_type=User)
 
 # Catches type mismatches early

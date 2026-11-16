@@ -62,9 +62,10 @@ def test_nonstring_tag_rejected_before_import_or_dispatch(tag):
 
 
 @pytest.mark.parametrize('expected', ['dict', 42, list[int] if hasattr(list, '__class_getitem__') else 'List[int]'])
-def test_expected_type_requires_a_concrete_python_type(expected):
+@pytest.mark.parametrize('safe', [False, True])
+def test_expected_type_requires_a_concrete_python_type(expected, safe):
     with pytest.raises(TypeError, match='concrete Python type'):
-        deserialize({}, expected_type=expected)
+        deserialize({}, expected_type=expected, safe=safe)
 
 
 @pytest.mark.parametrize('payload', [{}, [], None, 3])

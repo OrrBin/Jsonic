@@ -178,20 +178,20 @@ def _plan(value, annotation, path, unknown, classes):
     def build(values):
         attributes = values
         arguments = {name: attributes[mapping.get(name, name)] for name in kwargs}
-        instance = annotation(**arguments)
-        from jsonic.constructors import restore_attributes
-        # Restore typed non-constructor fields with the same invariant rules as
-        # normal decoding. Constructor parameters remain authoritative.
-        remaining = {key: child for key, child in attributes.items()
-                     if key not in {mapping.get(name, name) for name in arguments}}
         from dataclasses import replace
         from jsonic.context import _traversal, current_context
+        from jsonic.constructors import restore_attributes
         token = _traversal.set(replace(current_context(), path=path))
         try:
+            instance = annotation(**arguments)
+            # Constructor parameters remain authoritative; typed extra fields
+            # follow normal immutable-invariant restoration.
+            remaining = {key: child for key, child in attributes.items()
+                         if key not in {mapping.get(name, name) for name in arguments}}
             restore_attributes(instance, remaining, transient, private=True)
+            return instance
         finally:
             _traversal.reset(token)
-        return instance
     return _Build(build, parsed)
 
 

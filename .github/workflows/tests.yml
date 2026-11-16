@@ -1,0 +1,54 @@
+name: Tests and packages
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04]
+        python: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13']
+        pydantic: [absent, v1, v2]
+        include:
+          - {os: windows-2022, python: '3.8', pydantic: absent}
+          - {os: windows-2022, python: '3.13', pydantic: v2}
+          - {os: macos-15-intel, python: '3.13', pydantic: v1}
+          - {os: macos-15-intel, python: '3.13', pydantic: v2}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -r requirements-dev.txt
+      - if: matrix.pydantic == 'v1'
+        run: python -m pip install "pydantic>=1.10.13,<2"
+      - if: matrix.pydantic == 'v2'
+        run: python -m pip install "pydantic>=2,<3"
+      - name: Check optional dependency configuration
+        run: python scripts/check_dependency_mode.py ${{ matrix.pydantic }}
+      - name: Build wheel and source distribution
+        run: python -m build
+      - run: python -m twine check dist/*
+      - name: Inspect and install both distributions outside the checkout
+        run: python scripts/check_packages.py dist
+      - name: Prepare historical source and run all tests with explicit artifacts
+        run: python scripts/run_ci_tests.py
+      - name: Run documentation and examples
+        run: python scripts/check_docs.py
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: evidence-${{ matrix.os }}-${{ matrix.python }}-${{ matrix.pydantic }}
+          path: |
+            coverage.json
+            junit.xml
+            dist/*
