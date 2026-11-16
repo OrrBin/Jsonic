@@ -13,7 +13,7 @@ Python 3.6/3.7 and newer unqualified interpreters are excluded explicitly.
 Keeping 3.8 is a project compatibility choice, not a claim of upstream Python
 security support. Pydantic is optional: absent, v1 >=1.10.13,<2 and v2 >=2,<3
 are separate Linux jobs on every declared Python version. Windows has 3.8
-without Pydantic and 3.13/v2; macOS has 3.13/v1 and v2. This does not claim every
+without Pydantic and 3.13/v2; macOS 15 Intel has 3.13/v1 and v2. This does not claim every
 OS/dependency Cartesian combination is tested. Older interpreters receive
 compatible dependency versions through their own Requires-Python constraints.
 Setuptools build requirements are bounded to versions supporting Python 3.8.

@@ -17,8 +17,8 @@ jobs:
         include:
           - {os: windows-2022, python: '3.8', pydantic: absent}
           - {os: windows-2022, python: '3.13', pydantic: v2}
-          - {os: macos-15, python: '3.13', pydantic: v1}
-          - {os: macos-15, python: '3.13', pydantic: v2}
+          - {os: macos-15-intel, python: '3.13', pydantic: v1}
+          - {os: macos-15-intel, python: '3.13', pydantic: v2}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
