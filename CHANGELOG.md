@@ -1,7 +1,9 @@
-# 2.0.0rc1 — release candidate (unpublished)
+# 2.0.0
 
-Prepared 16 November 2026. This candidate packages the merged remediation and
-testing work for review; it has not been uploaded to PyPI or TestPyPI.
+Stable release preparation based on the published 2.0.0rc1 candidate.
+The version, package description and release/migration documents are updated;
+there are no runtime changes from the candidate. The summary below covers
+compatibility changes from 1.0.1.
 
 - Breaking changes include Python 3.8–3.13 support boundaries, exact root type
   checks, codec collision rejection, consistent filtering, restored slot fields,
@@ -14,6 +16,11 @@ testing work for review; it has not been uploaded to PyPI or TestPyPI.
 - Review MIGRATION.md before upgrading from published 1.0.1. Circular-reference
   ignoring (#1) remains deferred; cycles are rejected.
 
+
+## 2.0.0rc1 — 16 November 2026
+
+Published to PyPI as the release candidate for the 2.0 major line. The fixes
+and additive APIs below were included in that candidate.
 
 ## F09 — explicit Pydantic field-state persistence (#11)
 
@@ -187,7 +194,7 @@ Default root-only type checking remains unchanged. See VALIDATION_MODES.md.
 
 ## F15 — package and release qualification (#17, #25)
 
-Move metadata to pyproject.toml and mark this checkout 2.0.0.dev0, unreleased.
+Introduced pyproject.toml metadata and the 2.0 development line.
 Declare Python 3.8–3.13, package-only wheels, optional Pydantic and one developer
 dependency path. Add version/dependency CI plus Windows/macOS boundary coverage,
 wheel/sdist inspection and clean installations, explicit historical/wheel tests,

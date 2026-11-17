@@ -1,10 +1,10 @@
 # Jsonic Roadmap
 
-## Current candidate: 2.0.0rc1 (unpublished)
+## Implemented in the 2.0 line
 
 See README.md for implemented contracts, RELEASE.md for Python/dependency
-support and CI, and MIGRATION.md for upgrade behavior. Published PyPI 1.0.1
-is separate from this checkout. Strict typed input, v2 dictionary transport,
+support and CI, and MIGRATION.md for upgrade behavior. The 2.0.0rc1 candidate
+is published on PyPI; 2.0.0 preparation retains its runtime behavior. Strict typed input, v2 dictionary transport,
 Pydantic field-state persistence and traversal repairs are implemented.
 
 ## Deferred

@@ -15,7 +15,7 @@ with zipfile.ZipFile(str(wheel)) as archive:
     names = archive.namelist()
     assert all(name.startswith('jsonic/') or '.dist-info/' in name for name in names), names
     metadata = email.message_from_bytes(archive.read(next(n for n in names if n.endswith('/METADATA'))))
-    assert metadata['Version'] == '2.0.0rc1'
+    assert metadata['Version'] == '2.0.0'
     assert metadata['Requires-Python'] == '<3.14,>=3.8'
     assert 'pydantic' in metadata.get_all('Provides-Extra')
 with tarfile.open(str(sdist)) as archive:

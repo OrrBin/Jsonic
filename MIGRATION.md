@@ -1,6 +1,9 @@
-# Migration from published 1.0.1 to 2.0.0rc1
+# Migration from 1.0.1 to 2.0
 
-This is an unpublished major release candidate. No package has been uploaded.
+The 2.0 major line includes the published 2.0.0rc1 candidate and the 2.0.0
+stable package. The compatibility guidance below applies to both. Moving from
+the candidate to 2.0.0 changes release metadata and documentation, not runtime
+behavior.
 
 ## Observable changes requiring review
 
